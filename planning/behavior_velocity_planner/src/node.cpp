@@ -31,6 +31,7 @@
 #include <scene_module/blind_spot/manager.hpp>
 #include <scene_module/crosswalk/manager.hpp>
 #include <scene_module/detection_area/manager.hpp>
+#include <scene_module/dynamic_obstacle_stop/manager.hpp>
 #include <scene_module/intersection/manager.hpp>
 #include <scene_module/no_stopping_area/manager.hpp>
 #include <scene_module/occlusion_spot/manager.hpp>
@@ -150,6 +151,9 @@ BehaviorVelocityPlannerNode::BehaviorVelocityPlannerNode(const rclcpp::NodeOptio
   }
   if (this->declare_parameter("launch_occlusion_spot", true)) {
     planner_manager_.launchSceneModule(std::make_shared<OcclusionSpotModuleManager>(*this));
+  }
+  if (this->declare_parameter("launch_dynamic_obstacle_stop", true)) {
+    planner_manager_.launchSceneModule(std::make_shared<DynamicObstacleStopModuleManager>(*this));
   }
   // this module requires all the stop line.Therefore this modules should be placed at the bottom.
   if (this->declare_parameter("launch_no_stopping_area", true)) {
