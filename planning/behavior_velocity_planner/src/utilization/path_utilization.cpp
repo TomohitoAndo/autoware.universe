@@ -170,7 +170,7 @@ autoware_auto_planning_msgs::msg::Path interpolatePath(
   std::sort(s_tmp.begin(), s_tmp.end());
 
   for (const double s : s_tmp) {
-    if (!s_out.empty() && std::fabs(s_out.back() - s) < epsilon) {
+    if (!s_out.empty() && std::fabs(s_out.back() - s) < DOUBLE_EPSILON) {
       continue;
     }
     s_out.push_back(s);
@@ -190,7 +190,7 @@ autoware_auto_planning_msgs::msg::Path interpolatePath(
   size_t closest_segment_idx = 0;
   for (size_t i = 0; i < s_out.size() - 1; ++i) {
     for (size_t j = closest_segment_idx; j < s_in.size() - 1; ++j) {
-      if (s_in.at(j) < s_out.at(i) + DOUBLE_EPSILON && s_out.at(i) < s_in.at(j + 1)) {
+      if (s_in.at(j) < s_out.at(i) + epsilon && s_out.at(i) < s_in.at(j + 1)) {
         // find closest segment in s_in
         closest_segment_idx = j;
       }
