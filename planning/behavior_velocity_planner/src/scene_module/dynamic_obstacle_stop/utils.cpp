@@ -478,5 +478,15 @@ LineString2d createLineString2d(const lanelet::BasicPolygon2d & poly)
   return line_string;
 }
 
+void findClosestPlannedVelocityAndAcceleration(
+  const Trajectory & trajectory, const geometry_msgs::msg::Pose & current_pose,
+  float & closest_vel, float & closest_acc)
+{
+  const auto nearest_idx =
+    tier4_autoware_utils::findNearestIndex(trajectory.points, current_pose.position);
+
+  closest_vel = trajectory.points.at(nearest_idx).longitudinal_velocity_mps;
+  closest_acc = trajectory.points.at(nearest_idx).acceleration_mps2;
+}
 }  // namespace dynamic_obstacle_stop_utils
 }  // namespace behavior_velocity_planner

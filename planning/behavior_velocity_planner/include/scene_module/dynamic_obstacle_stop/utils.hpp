@@ -242,6 +242,11 @@ std::vector<DynamicObstacle> excludeObstaclesOutSideOfLine(
 Trajectory decimateTrajectory(const Trajectory & input_traj, const float step);
 
 LineString2d createLineString2d(const lanelet::BasicPolygon2d & poly);
+
+void findClosestPlannedVelocityAndAcceleration(
+  const Trajectory & trajectory, const geometry_msgs::msg::Pose & current_pose,
+  float & closest_vel, float & closest_acc);
+
 }  // namespace dynamic_obstacle_stop_utils
 }  // namespace behavior_velocity_planner
 #endif  // DYNAMIC_OBSTACLE_STOP_PLANNER_UTILS_HPP_

@@ -138,6 +138,11 @@ BehaviorVelocityPlannerNode::BehaviorVelocityPlannerNode(const rclcpp::NodeOptio
   sub_occupancy_grid_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
     "~/input/occupancy_grid", 1, std::bind(&BehaviorVelocityPlannerNode::onOccupancyGrid, this, _1),
     createSubscriptionOptions(this));
+  sub_smoothed_trajectory_ =
+    this->create_subscription<autoware_auto_planning_msgs::msg::Trajectory>(
+      "/planning/scenario_planning/trajectory", 1,
+      std::bind(&BehaviorVelocityPlannerNode::onSmoothedTrajectory, this, _1),
+      createSubscriptionOptions(this));
 
   // Publishers
   path_pub_ = this->create_publisher<autoware_auto_planning_msgs::msg::Path>("~/output/path", 1);
@@ -340,6 +345,13 @@ void BehaviorVelocityPlannerNode::onVirtualTrafficLightStates(
 {
   std::lock_guard<std::mutex> lock(mutex_);
   planner_data_.virtual_traffic_light_states = msg;
+}
+
+void BehaviorVelocityPlannerNode::onSmoothedTrajectory(
+  const autoware_auto_planning_msgs::msg::Trajectory::ConstSharedPtr msg)
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  planner_data_.prev_smoothed_trajectory = msg;
 }
 
 void BehaviorVelocityPlannerNode::onTrigger(
