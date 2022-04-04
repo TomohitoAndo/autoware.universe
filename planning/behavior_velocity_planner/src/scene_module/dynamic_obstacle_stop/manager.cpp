@@ -59,6 +59,7 @@ DynamicObstacleStopModuleManager::DynamicObstacleStopModuleManager(rclcpp::Node 
     p.use_objects = node.declare_parameter(ns + ".use_objects", true);
     p.use_predicted_path = node.declare_parameter(ns + ".use_predicted_path", false);
     p.use_partition_lanelet = node.declare_parameter(ns + ".use_partition_lanelet", true);
+    p.use_closest = node.declare_parameter(ns + ".use_closest", true);
     p.extend_distance = node.declare_parameter(ns + ".extend_distance", 5.0);
     p.stop_margin = node.declare_parameter(ns + ".stop_margin", 2.5);
     p.passing_margin = node.declare_parameter(ns + ".passing_margin", 1.0);
@@ -135,6 +136,8 @@ rcl_interfaces::msg::SetParametersResult DynamicObstacleStopModuleManager::param
     tier4_autoware_utils::updateParam(
       parameters, ns + "use_predicted_path",
       planner_param_.dynamic_obstacle_stop.use_predicted_path);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "use_closest", planner_param_.dynamic_obstacle_stop.use_closest);
     tier4_autoware_utils::updateParam(
       parameters, ns + "stop_margin", planner_param_.dynamic_obstacle_stop.stop_margin);
     tier4_autoware_utils::updateParam(

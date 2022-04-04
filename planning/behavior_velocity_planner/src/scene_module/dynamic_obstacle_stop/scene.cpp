@@ -87,14 +87,17 @@ bool DynamicObstacleStopModule::modifyPathVelocity(
     return true;
   }
 
-  // const auto current_vel = planner_data_->current_velocity->twist.linear.x;
-  // const auto current_acc = planner_data_->current_accel.get();
   const auto & current_pose = planner_data_->current_pose.pose;
 
   float current_vel;
   float current_acc;
-  dynamic_obstacle_stop_utils::findClosestPlannedVelocityAndAcceleration(
-    *planner_data_->prev_smoothed_trajectory, current_pose, current_vel, current_acc);
+  if (planner_param_.dynamic_obstacle_stop.use_closest) {
+    dynamic_obstacle_stop_utils::findClosestPlannedVelocityAndAcceleration(
+      *planner_data_->prev_smoothed_trajectory, current_pose, current_vel, current_acc);
+  } else {
+    current_vel = planner_data_->current_velocity->twist.linear.x;
+    current_acc = planner_data_->current_accel.get();
+  }
 
   // temporary convert to trajectory
   const auto input_traj = dynamic_obstacle_stop_utils::convertPathToTrajectory(*path);

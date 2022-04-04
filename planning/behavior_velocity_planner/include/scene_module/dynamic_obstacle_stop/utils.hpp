@@ -69,6 +69,7 @@ struct DynamicObstacleStopParam
   bool use_objects;
   bool use_predicted_path;
   bool use_partition_lanelet;
+  bool use_closest;
   double extend_distance;
   double stop_margin;
   double passing_margin;
