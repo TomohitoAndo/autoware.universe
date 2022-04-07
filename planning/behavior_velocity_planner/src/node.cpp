@@ -143,6 +143,9 @@ BehaviorVelocityPlannerNode::BehaviorVelocityPlannerNode(const rclcpp::NodeOptio
       "/planning/scenario_planning/trajectory", 1,
       std::bind(&BehaviorVelocityPlannerNode::onSmoothedTrajectory, this, _1),
       createSubscriptionOptions(this));
+  sub_velocity_limit_ = this->create_subscription<tier4_planning_msgs::msg::VelocityLimit>(
+    "/planning/scenario_planning/max_velocity", 1,
+    std::bind(&BehaviorVelocityPlannerNode::onVelocityLimit, this, std::placeholders::_1));
 
   // Publishers
   path_pub_ = this->create_publisher<autoware_auto_planning_msgs::msg::Path>("~/output/path", 1);
@@ -354,6 +357,12 @@ void BehaviorVelocityPlannerNode::onSmoothedTrajectory(
   planner_data_.prev_smoothed_trajectory = msg;
 }
 
+void BehaviorVelocityPlannerNode::onVelocityLimit(
+  const tier4_planning_msgs::msg::VelocityLimit::ConstSharedPtr msg)
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  planner_data_.velocity_limit = msg;
+}
 void BehaviorVelocityPlannerNode::onTrigger(
   const autoware_auto_planning_msgs::msg::PathWithLaneId::ConstSharedPtr input_path_msg)
 {

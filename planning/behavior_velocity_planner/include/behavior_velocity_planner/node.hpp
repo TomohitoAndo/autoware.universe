@@ -30,6 +30,7 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <tier4_api_msgs/msg/crosswalk_status.hpp>
 #include <tier4_api_msgs/msg/intersection_status.hpp>
+#include <tier4_planning_msgs/msg/velocity_limit.hpp>
 
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
@@ -69,7 +70,9 @@ private:
   rclcpp::Subscription<tier4_v2x_msgs::msg::VirtualTrafficLightStateArray>::SharedPtr
     sub_virtual_traffic_light_states_;
   rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr sub_occupancy_grid_;
-  rclcpp::Subscription<autoware_auto_planning_msgs::msg::Trajectory>::SharedPtr sub_smoothed_trajectory_;
+  rclcpp::Subscription<autoware_auto_planning_msgs::msg::Trajectory>::SharedPtr
+    sub_smoothed_trajectory_;
+  rclcpp::Subscription<tier4_planning_msgs::msg::VelocityLimit>::SharedPtr sub_velocity_limit_;
 
   void onTrigger(
     const autoware_auto_planning_msgs::msg::PathWithLaneId::ConstSharedPtr input_path_msg);
@@ -88,7 +91,10 @@ private:
   void onVirtualTrafficLightStates(
     const tier4_v2x_msgs::msg::VirtualTrafficLightStateArray::ConstSharedPtr msg);
   void onOccupancyGrid(const nav_msgs::msg::OccupancyGrid::ConstSharedPtr msg);
+
+  // TODO(Tomohito Ando): temporary for experiments
   void onSmoothedTrajectory(const autoware_auto_planning_msgs::msg::Trajectory::ConstSharedPtr msg);
+  void onVelocityLimit(const tier4_planning_msgs::msg::VelocityLimit::ConstSharedPtr input_msg);
 
   // publisher
   rclcpp::Publisher<autoware_auto_planning_msgs::msg::Path>::SharedPtr path_pub_;

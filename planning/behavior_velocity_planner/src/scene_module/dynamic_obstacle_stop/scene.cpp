@@ -87,6 +87,10 @@ bool DynamicObstacleStopModule::modifyPathVelocity(
     return true;
   }
 
+  if (!planner_data_->velocity_limit) {
+    return true;
+  }
+
   const auto & current_pose = planner_data_->current_pose.pose;
 
   float current_vel;
@@ -1208,7 +1212,7 @@ boost::optional<Trajectory> DynamicObstacleStopModule::applySmoother(
   // apply max veloicty to do the same calculation as smoother
   Trajectory velocity_limited_trajectory = input_trajectory;
   dynamic_obstacle_stop_utils::applyMaximumVelocityLimit(
-    planner_param_.dynamic_obstacle_stop.velocity_limit_kmph / 3.6, velocity_limited_trajectory);
+    planner_data_->velocity_limit->max_velocity, velocity_limited_trajectory);
 
   // smooth the velocity by using smoother
   const auto smoother_input =

@@ -78,7 +78,6 @@ struct DynamicObstacleStopParam
   float detection_distance;
   float detection_span;
   float min_vel_ego_kmph;
-  float velocity_limit_kmph;  // temporary
   bool calc_collision_from_point;
 };
 
