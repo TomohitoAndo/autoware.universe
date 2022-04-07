@@ -139,7 +139,7 @@ class TrajectoryVisualizer(Node):
         self.sub8 = message_filters.Subscriber(
             self,
             Trajectory,
-            lane_driving + "/motion_planning/obstacle_avoidance_planner/trajectory",
+            "/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/dynamic_obstacle_stop/debug/trajectory",
         )
         self.sub9 = message_filters.Subscriber(self, Trajectory, lane_driving + "/trajectory")
 
@@ -233,7 +233,7 @@ class TrajectoryVisualizer(Node):
         self.ax1 = plt.subplot(1, 1, 1)  # row, col, index(<raw*col)
         (self.im1,) = self.ax1.plot([], [], label="0: lane_change_path", marker="")
         (self.im2,) = self.ax1.plot([], [], label="1: behavior_path", marker="", ls="--")
-        (self.im3,) = self.ax1.plot([], [], label="2: obstacle_avoid_traj", marker="", ls="-.")
+        (self.im3,) = self.ax1.plot([], [], label="2: dynamic obstacle stop debug traj", marker="", ls="-.")
         (self.im4,) = self.ax1.plot([], [], label="3: obstacle_stop_traj", marker="", ls="--")
         (self.im5,) = self.ax1.plot([], [], label="4-1: opt input", marker="", ls="--")
         (self.im6,) = self.ax1.plot(
