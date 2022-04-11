@@ -79,7 +79,7 @@ bool DynamicObstacleStopModule::modifyPathVelocity(
     return true;
   }
 
-  if (!planner_data_->no_ground_pointcloud) {
+  if (!planner_data_->compare_map_filtered_pointcloud) {
     return true;
   }
 
@@ -139,8 +139,7 @@ bool DynamicObstacleStopModule::modifyPathVelocity(
     visualizePassingArea(trim_trajectory, current_pose);
   } else {
     const auto voxel_grid_filtered_points =
-      applyVoxelGridFilter(planner_data_->no_ground_pointcloud);
-    // todo: replace with compare map filtered
+      applyVoxelGridFilter(planner_data_->compare_map_filtered_pointcloud);
     const auto extracted_points =
       extractObstaclePointsWithRectangle(voxel_grid_filtered_points, current_pose);
     dynamic_obstacles = createDynamicObstaclesFromPoints(extracted_points, input_traj);
