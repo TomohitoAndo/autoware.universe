@@ -85,7 +85,12 @@ BehaviorVelocityPlannerNode::BehaviorVelocityPlannerNode(const rclcpp::NodeOptio
       std::bind(&BehaviorVelocityPlannerNode::onPredictedObjects, this, _1));
   sub_no_ground_pointcloud_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     "~/input/no_ground_pointcloud", rclcpp::SensorDataQoS(),
-    std::bind(&BehaviorVelocityPlannerNode::onNoGroundPointCloud, this, _1));
+    std::bind(&BehaviorVelocityPlannerNode::onNoGroundPointCloud, this, _1),
+    createSubscriptionOptions(this));
+  sub_compare_map_filtered_pointcloud_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+    "~/input/compare_map_filtered_pointcloud", rclcpp::SensorDataQoS(),
+    std::bind(&BehaviorVelocityPlannerNode::onCompareMapFilteredPointCloud, this, _1),
+    createSubscriptionOptions(this));
   sub_vehicle_odometry_ = this->create_subscription<nav_msgs::msg::Odometry>(
     "~/input/vehicle_odometry", 1,
     std::bind(&BehaviorVelocityPlannerNode::onVehicleVelocity, this, _1));
@@ -184,6 +189,9 @@ bool BehaviorVelocityPlannerNode::isDataReady()
   if (!d.no_ground_pointcloud) {
     return false;
   }
+  if (!d.compare_map_filtered_pointcloud) {
+    return false;
+  }
   if (!d.route_handler_) {
     return false;
   }
@@ -226,6 +234,31 @@ void BehaviorVelocityPlannerNode::onNoGroundPointCloud(
   pcl::transformPointCloud(pc, *pc_transformed, affine);
 
   planner_data_.no_ground_pointcloud = pc_transformed;
+}
+
+void BehaviorVelocityPlannerNode::onCompareMapFilteredPointCloud(
+  const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg)
+{
+  geometry_msgs::msg::TransformStamped transform;
+  try {
+    transform = tf_buffer_.lookupTransform(
+      "map", msg->header.frame_id, msg->header.stamp, rclcpp::Duration::from_seconds(0.1));
+  } catch (tf2::TransformException & e) {
+    RCLCPP_WARN(get_logger(), "no transform found for no_ground_pointcloud: %s", e.what());
+    return;
+  }
+
+  pcl::PointCloud<pcl::PointXYZ> pc;
+  pcl::fromROSMsg(*msg, pc);
+
+  Eigen::Affine3f affine = tf2::transformToEigen(transform.transform).cast<float>();
+  pcl::PointCloud<pcl::PointXYZ>::Ptr pc_transformed(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::transformPointCloud(pc, *pc_transformed, affine);
+
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    planner_data_.compare_map_filtered_pointcloud = pc_transformed;
+  }
 }
 
 void BehaviorVelocityPlannerNode::onVehicleVelocity(
