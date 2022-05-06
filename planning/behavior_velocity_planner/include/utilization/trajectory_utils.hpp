@@ -141,6 +141,17 @@ inline bool smoothPath(
     motion_velocity_smoother::trajectory_utils::applyMaximumVelocityLimit(
       0, trajectory.size(), external_v_limit->max_velocity, trajectory);
   }
+  // Smoother can not handle negative velocity,
+  // so multiple -1 to velocity if any trajectory points have reverse velocity
+  const bool is_reverse = std::any_of(
+    trajectory.begin(), trajectory.end(),
+    [](auto & pt) { return pt.longitudinal_velocity_mps < 0; });
+  if (is_reverse) {
+    for (auto & pt : trajectory) {
+      pt.longitudinal_velocity_mps *= -1.0;
+    }
+  }
+
   const auto traj_lateral_acc_filtered = smoother->applyLateralAccelerationFilter(trajectory);
   auto nearest_idx =
     tier4_autoware_utils::findNearestIndex(*traj_lateral_acc_filtered, current_pose.position);
@@ -182,6 +193,14 @@ inline bool smoothPath(
   traj_smoothed.insert(
     traj_smoothed.begin(), traj_resampled->begin(),
     traj_resampled->begin() + *traj_resampled_closest);
+
+  // for reverse velocity
+  if (is_reverse) {
+    for (auto & pt : traj_smoothed) {
+      pt.longitudinal_velocity_mps *= -1.0;
+    }
+  }
+
   out_path = convertTrajectoryPointsToPath(traj_smoothed);
   return true;
 }
