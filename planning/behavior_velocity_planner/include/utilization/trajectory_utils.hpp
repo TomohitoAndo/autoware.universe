@@ -137,10 +137,13 @@ inline bool smoothPath(
   const double max = std::numeric_limits<double>::max();
 
   auto trajectory = convertPathToTrajectoryPoints(in_path);
+
+  // Apply external velocity limit
   if (external_v_limit) {
     motion_velocity_smoother::trajectory_utils::applyMaximumVelocityLimit(
       0, trajectory.size(), external_v_limit->max_velocity, trajectory);
   }
+
   // Smoother can not handle negative velocity,
   // so multiple -1 to velocity if any trajectory points have reverse velocity
   const bool is_reverse = std::any_of(
@@ -152,27 +155,41 @@ inline bool smoothPath(
     }
   }
 
+  // Lateral acceleration limit
   const auto traj_lateral_acc_filtered = smoother->applyLateralAccelerationFilter(trajectory);
-  }
-  // Resample trajectory with ego-velocity based interval distances
-  auto traj_resampled = smoother->resampleTrajectory(traj_with_ego_point_on_path, v0, nearest_idx);
-  const auto traj_resampled_closest = findNearestIndex(*traj_resampled, current_pose, max, M_PI_4);
-  if (!traj_resampled_closest) {
+  if (!traj_lateral_acc_filtered) {
     return false;
   }
-  std::vector<TrajectoryPoints> debug_trajectories;
+  const auto traj_lateral_nearest_idx = findNearestIndex(*traj_lateral_acc_filtered, current_pose, max, M_PI_4);
+  if (!traj_lateral_nearest_idx) {
+    return false;
+  }
+
+  // Resample trajectory with ego-velocity based interval distances
+  auto traj_resampled = smoother->resampleTrajectory(*traj_lateral_acc_filtered, v0, *traj_lateral_nearest_idx);
+  if (!traj_resampled) {
+    return false;
+  }
+  const auto traj_resampled_nearest_idx = findNearestIndex(*traj_resampled, current_pose, max, M_PI_4);
+  if (!traj_resampled_nearest_idx) {
+    return false;
+  }
+
   // Clip trajectory from closest point
   TrajectoryPoints clipped;
-  TrajectoryPoints traj_smoothed;
   clipped.insert(
-    clipped.end(), traj_resampled->begin() + *traj_resampled_closest, traj_resampled->end());
+    clipped.end(), traj_resampled->begin() + *traj_resampled_nearest_idx, traj_resampled->end());
+
+  // Apply velocity smoother
+  TrajectoryPoints traj_smoothed;
+  std::vector<TrajectoryPoints> debug_trajectories;
   if (!smoother->apply(v0, a0, clipped, traj_smoothed, debug_trajectories)) {
     std::cerr << "[behavior_velocity][trajectory_utils]: failed to smooth" << std::endl;
     return false;
   }
   traj_smoothed.insert(
     traj_smoothed.begin(), traj_resampled->begin(),
-    traj_resampled->begin() + *traj_resampled_closest);
+    traj_resampled->begin() + *traj_resampled_nearest_idx);
 
   // for reverse velocity
   if (is_reverse) {
