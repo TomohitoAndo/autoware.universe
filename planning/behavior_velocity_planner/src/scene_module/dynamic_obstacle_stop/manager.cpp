@@ -58,15 +58,6 @@ DynamicObstacleStopModuleManager::DynamicObstacleStopModuleManager(rclcpp::Node 
   }
 
   {
-    auto & p = planner_param_.detection_area;
-    const std::string ns_da = ns + ".detection_area_size";
-    p.dist_ahead = node.declare_parameter(ns_da + ".dist_ahead", 50.0);
-    p.dist_behind = node.declare_parameter(ns_da + ".dist_behind", 5.0);
-    p.dist_right = node.declare_parameter(ns_da + ".dist_right", 10.0);
-    p.dist_left = node.declare_parameter(ns_da + ".dist_left", 10.0);
-  }
-
-  {
     auto & p = planner_param_.dynamic_obstacle;
     const std::string ns_do = ns + ".dynamic_obstacle";
     p.min_vel_kmph = node.declare_parameter(ns_do + ".min_vel_kmph", 0.0);
