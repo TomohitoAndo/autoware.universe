@@ -68,7 +68,8 @@ bool DynamicObstacleStopModule::modifyPathVelocity(
     extended_smoothed_path, current_pose, trim_distance);
 
   // create abstracted dynamic obstacles from objects or points
-  dynamic_obstacle_creator_->setData(*planner_data_, *path);
+  const auto detection_area_poly = createDetectionAreaPolygon(trim_smoothed_path);
+  dynamic_obstacle_creator_->setData(*planner_data_, *path, detection_area_poly);
   const auto dynamic_obstacles = dynamic_obstacle_creator_->createDynamicObstacles();
   debug_ptr_->setDebugValues(DebugValues::TYPE::NUM_OBSTACLES, dynamic_obstacles.size());
 
@@ -104,34 +105,23 @@ bool DynamicObstacleStopModule::modifyPathVelocity(
     applyMaxJerkLimit(current_pose, current_vel, current_acc, *path);
   }
 
-  visualizeDetectionArea(trim_smoothed_path);
   publishDebugValue(
     trim_smoothed_path, partition_excluded_obstacles, dynamic_obstacle, current_pose);
 
   return true;
 }
 
-pcl::PointCloud<pcl::PointXYZ> DynamicObstacleStopModule::extractObstaclePointsWithRectangle(
-  const pcl::PointCloud<pcl::PointXYZ> & input_points,
-  const geometry_msgs::msg::Pose & current_pose) const
-{
-  const auto detection_area_polygon =
-    createDetectionAreaPolygon(current_pose, planner_param_.detection_area);
-
-  debug_ptr_->pushDebugPolygons(detection_area_polygon);
-
-  const auto extracted_points = pointsWithinPolygon(detection_area_polygon, input_points);
-
-  return extracted_points;
-}
-
-void DynamicObstacleStopModule::visualizeDetectionArea(const PathWithLaneId & smoothed_path) const
+Polygons2d DynamicObstacleStopModule::createDetectionAreaPolygon(
+  const PathWithLaneId & smoothed_path) const
 {
   // calculate distance needed to stop with jerk and acc constraints
   const float initial_vel = planner_data_->current_velocity->twist.linear.x;
   const float initial_acc = planner_data_->current_accel.get();
   const float target_vel = 0.0;
-  const float jerk_dec = planner_param_.dynamic_obstacle_stop.deceleration_jerk;
+  const float jerk_dec_max = -0.1;
+  const float jerk_dec = planner_param_.dynamic_obstacle_stop.specify_decel_jerk
+                           ? planner_param_.dynamic_obstacle_stop.deceleration_jerk
+                           : jerk_dec_max;
   const float jerk_acc = std::abs(jerk_dec);
   const float planning_dec = jerk_dec < planner_param_.common.normal_min_jerk
                                ? planner_param_.common.limit_min_acc
@@ -139,27 +129,33 @@ void DynamicObstacleStopModule::visualizeDetectionArea(const PathWithLaneId & sm
   auto stop_dist = dynamic_obstacle_stop_utils::calcDecelDistWithJerkAndAccConstraints(
     initial_vel, target_vel, initial_acc, planning_dec, jerk_acc, jerk_dec);
 
+  // TODO(Tomohito Ando): appropriate distance?
   if (!stop_dist) {
-    return;
+    *stop_dist = 0;
   }
 
+  // create detection area polygon
   DetectionRange da_range;
-  const float obstacle_vel_mps = planner_param_.dynamic_obstacle.max_vel_kmph / 3.6;
-  da_range.interval = planner_param_.dynamic_obstacle_stop.detection_distance;
-  da_range.min_longitudinal_distance = planner_param_.vehicle_param.base_to_front;
+  const auto & p = planner_param_;
+  const double obstacle_vel_mps = p.dynamic_obstacle.max_vel_kmph / 3.6;
+  da_range.interval = p.dynamic_obstacle_stop.detection_distance;
+  da_range.min_longitudinal_distance = p.vehicle_param.base_to_front;
+  // set minimum distance to avoid hunting of detection
+  const double limited_longitudinal_dist = p.dynamic_obstacle_stop.stop_margin + 1.0;
   da_range.max_longitudinal_distance =
-    *stop_dist + planner_param_.dynamic_obstacle_stop.stop_margin;
-  da_range.min_lateral_distance = planner_param_.vehicle_param.width / 2.0;
-  da_range.max_lateral_distance =
-    obstacle_vel_mps * planner_param_.dynamic_obstacle.max_prediction_time;
+    std::max(*stop_dist + p.dynamic_obstacle_stop.stop_margin, limited_longitudinal_dist);
+  da_range.min_lateral_distance = p.vehicle_param.width / 2.0;
+  da_range.max_lateral_distance = obstacle_vel_mps * p.dynamic_obstacle.max_prediction_time;
   Polygons2d detection_area_poly;
   planning_utils::createDetectionAreaPolygons(
     detection_area_poly, smoothed_path, planner_data_->current_pose.pose, da_range,
-    planner_param_.dynamic_obstacle.max_vel_kmph / 3.6);
+    p.dynamic_obstacle.max_vel_kmph / 3.6);
 
   for (const auto & poly : detection_area_poly) {
     debug_ptr_->pushDetectionAreaPolygons(poly);
   }
+
+  return detection_area_poly;
 }
 
 pcl::PointCloud<pcl::PointXYZ> DynamicObstacleStopModule::pointsWithinPolygon(
