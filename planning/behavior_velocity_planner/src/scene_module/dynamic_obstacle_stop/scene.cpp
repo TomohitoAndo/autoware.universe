@@ -158,29 +158,6 @@ Polygons2d DynamicObstacleStopModule::createDetectionAreaPolygon(
   return detection_area_poly;
 }
 
-pcl::PointCloud<pcl::PointXYZ> DynamicObstacleStopModule::pointsWithinPolygon(
-  const std::vector<geometry_msgs::msg::Point> & polygon,
-  const pcl::PointCloud<pcl::PointXYZ> & candidate_points) const
-{
-  // convert to boost type
-  const tier4_autoware_utils::Polygon2d bg_poly =
-    dynamic_obstacle_stop_utils::createBoostPolyFromMsg(polygon);
-
-  // find points in detection area
-  pcl::PointCloud<pcl::PointXYZ> within_points;
-  for (const auto & p : candidate_points) {
-    tier4_autoware_utils::Point2d point(p.x, p.y);
-
-    if (!bg::covered_by(point, bg_poly)) {
-      continue;
-    }
-
-    within_points.push_back(p);
-  }
-
-  return within_points;
-}
-
 boost::optional<DynamicObstacle> DynamicObstacleStopModule::detectCollision(
   const std::vector<DynamicObstacle> & dynamic_obstacles, const PathWithLaneId & path) const
 {

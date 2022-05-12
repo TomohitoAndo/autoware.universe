@@ -416,55 +416,6 @@ PathWithLaneId trimPathFromSelfPose(
   return output;
 }
 
-std::vector<geometry_msgs::msg::Point> createDetectionAreaPolygon(
-  const geometry_msgs::msg::Pose & current_pose, const DetectionAreaSize detection_area_size)
-{
-  const auto & d = detection_area_size;
-  const auto p1 = tier4_autoware_utils::calcOffsetPose(current_pose, d.dist_ahead, d.dist_left, 0);
-  const auto p2 =
-    tier4_autoware_utils::calcOffsetPose(current_pose, d.dist_ahead, -d.dist_right, 0);
-  const auto p3 =
-    tier4_autoware_utils::calcOffsetPose(current_pose, -d.dist_behind, -d.dist_right, 0);
-  const auto p4 =
-    tier4_autoware_utils::calcOffsetPose(current_pose, -d.dist_behind, d.dist_left, 0);
-
-  std::vector<geometry_msgs::msg::Point> detection_area;
-  detection_area.emplace_back(p1.position);
-  detection_area.emplace_back(p2.position);
-  detection_area.emplace_back(p3.position);
-  detection_area.emplace_back(p4.position);
-
-  return detection_area;
-}
-
-// create polygon for passing lines and deceleration line calculated by stopping jerk
-// note that this polygon is not closed
-boost::optional<std::vector<geometry_msgs::msg::Point>> createDetectionAreaPolygon(
-  const std::vector<std::vector<geometry_msgs::msg::Point>> & passing_lines,
-  const size_t deceleration_line_idx)
-{
-  if (passing_lines.size() != 2) {
-    return {};
-  }
-
-  std::vector<geometry_msgs::msg::Point> detection_area_polygon;
-  const auto & line1 = passing_lines.at(0);
-  const int poly_corner_idx = std::min(deceleration_line_idx, line1.size() - 1);
-  for (int i = 0; i <= poly_corner_idx; i++) {
-    const auto & p = line1.at(i);
-    detection_area_polygon.push_back(p);
-  }
-
-  // push points from the end to create the polygon
-  const auto & line2 = passing_lines.at(1);
-  for (int i = poly_corner_idx; i >= 0; i--) {
-    const auto & p = line2.at(i);
-    detection_area_polygon.push_back(p);
-  }
-
-  return detection_area_polygon;
-}
-
 PathPointWithLaneId createExtendPathPoint(
   const double extend_distance, const PathPointWithLaneId & goal_point)
 {
