@@ -72,6 +72,8 @@ private:
 
   void visualizeDetectionArea(const PathWithLaneId & smoothed_path) const;
 
+  Polygons2d createDetectionAreaPolygon(const PathWithLaneId & smoothed_path) const;
+
   pcl::PointCloud<pcl::PointXYZ> pointsWithinPolygon(
     const std::vector<geometry_msgs::msg::Point> & polygon,
     const pcl::PointCloud<pcl::PointXYZ> & candidate_points) const;
