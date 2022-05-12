@@ -30,7 +30,6 @@ namespace bg = boost::geometry;
 using autoware_auto_perception_msgs::msg::PredictedObjects;
 using autoware_auto_planning_msgs::msg::PathPointWithLaneId;
 using autoware_auto_planning_msgs::msg::PathWithLaneId;
-using dynamic_obstacle_stop_utils::DetectionAreaSize;
 using dynamic_obstacle_stop_utils::PlannerParam;
 using dynamic_obstacle_stop_utils::State;
 using tier4_debug_msgs::msg::Float32Stamped;
@@ -70,13 +69,7 @@ private:
     const pcl::PointCloud<pcl::PointXYZ> & input_points,
     const geometry_msgs::msg::Pose & current_pose) const;
 
-  void visualizeDetectionArea(const PathWithLaneId & smoothed_path) const;
-
   Polygons2d createDetectionAreaPolygon(const PathWithLaneId & smoothed_path) const;
-
-  pcl::PointCloud<pcl::PointXYZ> pointsWithinPolygon(
-    const std::vector<geometry_msgs::msg::Point> & polygon,
-    const pcl::PointCloud<pcl::PointXYZ> & candidate_points) const;
 
   boost::optional<DynamicObstacle> detectCollision(
     const std::vector<DynamicObstacle> & dynamic_obstacles,
