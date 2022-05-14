@@ -18,7 +18,10 @@
 #include "scene_module/dynamic_obstacle_stop/scene.hpp"
 #include "scene_module/scene_module_interface.hpp"
 
+#include <tier4_autoware_utils/ros/update_param.hpp>
+
 #include <memory>
+#include <vector>
 
 namespace behavior_velocity_planner
 {
@@ -40,6 +43,11 @@ private:
     const autoware_auto_planning_msgs::msg::PathWithLaneId & path) override;
 
   void setDynamicObstacleCreator(rclcpp::Node & node);
+
+  // Dynamic Reconfigure
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr set_param_res_;
+  rcl_interfaces::msg::SetParametersResult paramCallback(
+    const std::vector<rclcpp::Parameter> & parameters);
 };
 }  // namespace behavior_velocity_planner
 
