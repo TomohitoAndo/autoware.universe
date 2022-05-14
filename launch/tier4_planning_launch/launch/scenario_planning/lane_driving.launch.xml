@@ -13,7 +13,7 @@
     <!-- behavior planning module -->
     <group>
       <push-ros-namespace namespace="behavior_planning"/>
-      <arg name="detection_method" default="Object" description="options: `Object`, `ObjectWithoutPath` or `Points`"/>
+      <arg name="detection_method" default="Points" description="options: `Object`, `ObjectWithoutPath` or `Points`"/>
 
       <include file="$(find-pkg-share tier4_planning_launch)/launch/scenario_planning/lane_driving/behavior_planning/behavior_planning.launch.py">
         <arg name="vehicle_info_param_file" value="$(var vehicle_info_param_file)"/>

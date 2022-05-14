@@ -5,7 +5,7 @@
       use_partition_lanelet: true # [-] whether to use partition lanelet map data
       specify_decel_jerk: false   # [-] whether to specify jerk when ego decelerates
       stop_margin: 2.5            # [m] the vehicle decelerates to be able to stop with this margin
-      passing_margin: 1.1         # [m] the vehicle begins to accelerate if the vehicle's front in predicted position is ahead of the obstacle + this margin
+      passing_margin: 0.3         # [m] the vehicle begins to accelerate if the vehicle's front in predicted position is ahead of the obstacle + this margin
       deceleration_jerk: -0.3     # [m/s^3] ego decelerates with this jerk when stopping for obstacles
       obstacle_velocity_kph: 5.0  # [km/h] assumption for obstacle velocity
       detection_distance: 45.0    # [m] ahead distance from ego to detect the obstacles
