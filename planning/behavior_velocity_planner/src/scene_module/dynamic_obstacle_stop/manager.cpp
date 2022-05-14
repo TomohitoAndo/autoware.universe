@@ -89,6 +89,85 @@ DynamicObstacleStopModuleManager::DynamicObstacleStopModuleManager(rclcpp::Node 
 
   debug_ptr_ = std::make_shared<DynamicObstacleStopDebug>(node);
   setDynamicObstacleCreator(node);
+
+  // Set parameter callback
+  set_param_res_ = node.add_on_set_parameters_callback(
+    std::bind(&DynamicObstacleStopModuleManager::paramCallback, this, std::placeholders::_1));
+}
+
+rcl_interfaces::msg::SetParametersResult DynamicObstacleStopModuleManager::paramCallback(
+  const std::vector<rclcpp::Parameter> & parameters)
+{
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
+  result.reason = "success";
+
+  try {
+    std::string ns = "dynamic_obstacle_stop.";
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "specify_decel_jerk",
+      planner_param_.dynamic_obstacle_stop.specify_decel_jerk);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "stop_margin", planner_param_.dynamic_obstacle_stop.stop_margin);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "passing_margin", planner_param_.dynamic_obstacle_stop.passing_margin);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "deceleration_jerk", planner_param_.dynamic_obstacle_stop.deceleration_jerk);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "obstacle_velocity_kph",
+      planner_param_.dynamic_obstacle_stop.obstacle_velocity_kph);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "detection_distance",
+      planner_param_.dynamic_obstacle_stop.detection_distance);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "detection_span", planner_param_.dynamic_obstacle_stop.detection_span);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "min_vel_ego_kmph", planner_param_.dynamic_obstacle_stop.min_vel_ego_kmph);
+
+    ns = "dynamic_obstacle_stop.dynamic_obstacle.";
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "min_vel_kmph", planner_param_.dynamic_obstacle.min_vel_kmph);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "max_vel_kmph", planner_param_.dynamic_obstacle.max_vel_kmph);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "diameter", planner_param_.dynamic_obstacle.diameter);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "height", planner_param_.dynamic_obstacle.height);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "max_prediction_time", planner_param_.dynamic_obstacle.max_prediction_time);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "time_step", planner_param_.dynamic_obstacle.time_step);
+
+    ns = "dynamic_obstacle_stop.approaching.";
+    tier4_autoware_utils::updateParam(parameters, ns + "enable", planner_param_.approaching.enable);
+    tier4_autoware_utils::updateParam(parameters, ns + "margin", planner_param_.approaching.margin);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "limit_vel_kmph", planner_param_.approaching.limit_vel_kmph);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "stop_thresh", planner_param_.approaching.stop_thresh);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "stop_time_thresh", planner_param_.approaching.stop_time_thresh);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "dist_thresh", planner_param_.approaching.dist_thresh);
+
+    ns = "dynamic_obstacle_stop.slow_down_limit.";
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "enable", planner_param_.slow_down_limit.enable);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "max_jerk", planner_param_.slow_down_limit.max_jerk);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "max_acc", planner_param_.slow_down_limit.max_acc);
+  } catch (const rclcpp::exceptions::InvalidParameterTypeException & e) {
+    result.successful = false;
+    result.reason = e.what();
+  }
+
+  for (const auto & scene_module : scene_modules_) {
+    std::dynamic_pointer_cast<DynamicObstacleStopModule>(scene_module)
+      ->setPlannerParam(planner_param_);
+  }
+
+  return result;
 }
 
 void DynamicObstacleStopModuleManager::launchNewModules(
