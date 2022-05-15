@@ -170,6 +170,10 @@ boost::optional<DynamicObstacle> DynamicObstacleStopModule::detectCollision(
   // ignore the travel time from current pose to nearest path point?
   float travel_time = 0.0;
   float dist_sum = 0.0;
+
+  // save previous data to search densely after sparse search
+  size_t prev_idx = 0;
+  float prev_travel_time = 0;
   for (size_t idx = 1; idx < path.points.size(); idx++) {
     const auto & p1 = path.points.at(idx - 1).point;
     const auto & p2 = path.points.at(idx).point;
@@ -197,25 +201,31 @@ boost::optional<DynamicObstacle> DynamicObstacleStopModule::detectCollision(
       debug_ptr_->pushDebugTexts(sstream.str(), p2.pose, /* lateral_offset */ 3.0);
     }
 
-    auto obstacles_collision =
+    const auto collision_detected =
       checkCollisionWithObstacles(dynamic_obstacles, vehicle_poly, travel_time);
-    if (obstacles_collision.empty()) {
+
+    if (!collision_detected) {
+      prev_idx = idx;
+      prev_travel_time = travel_time;
       continue;
     }
 
-    const auto obstacle_selected = findNearestCollisionObstacle(path, p2.pose, obstacles_collision);
+    // obstacles are detected, so search more densely from previous search
+    // prev_idx is already searched, so start from prev_idx + 1
+    auto obstacle_selected =
+      detectCollisionFrom(prev_idx + 1, idx, prev_travel_time, dynamic_obstacles, path);
     if (!obstacle_selected) {
       continue;
     }
 
     // debug
-    {
-      std::stringstream sstream;
-      sstream << std::setprecision(4) << "ttc: " << std::to_string(travel_time) << "s";
-      debug_ptr_->pushDebugTexts(sstream.str(), obstacle_selected->nearest_collision_point);
-      debug_ptr_->pushDebugPoints(obstacle_selected->collision_points);
-      debug_ptr_->pushDebugPoints(obstacle_selected->nearest_collision_point, PointType::Red);
-    }
+    // {
+    //   std::stringstream sstream;
+    //   sstream << std::setprecision(4) << "ttc: " << std::to_string(travel_time) << "s";
+    //   debug_ptr_->pushDebugTexts(sstream.str(), obstacle_selected->nearest_collision_point);
+    //   debug_ptr_->pushDebugPoints(obstacle_selected->collision_points);
+    //   debug_ptr_->pushDebugPoints(obstacle_selected->nearest_collision_point, PointType::Red);
+    // }
 
     return obstacle_selected;
   }
@@ -312,9 +322,107 @@ std::vector<geometry_msgs::msg::Point> DynamicObstacleStopModule::createVehicleP
   return vehicle_poly;
 }
 
-std::vector<DynamicObstacle> DynamicObstacleStopModule::checkCollisionWithObstacles(
+bool DynamicObstacleStopModule::checkCollisionWithObstacles(
   const std::vector<DynamicObstacle> & dynamic_obstacles,
-  std::vector<geometry_msgs::msg::Point> poly, const float travel_time) const
+  const std::vector<geometry_msgs::msg::Point> & poly, const float travel_time) const
+{
+  const auto bg_poly_vehicle = dynamic_obstacle_stop_utils::createBoostPolyFromMsg(poly);
+
+  for (const auto & obstacle : dynamic_obstacles) {
+    // get classification that has highest probability
+    const auto classification =
+      dynamic_obstacle_stop_utils::getHighestProbLabel(obstacle.classifications);
+
+    // detect only pedestrian and bicycle
+    if (
+      classification != ObjectClassification::PEDESTRIAN &&
+      classification != ObjectClassification::BICYCLE) {
+      continue;
+    }
+
+    // calculate predicted obstacle pose for min velocity and max velocity
+    const auto predicted_obstacle_pose_min_vel =
+      calcPredictedObstaclePose(obstacle.predicted_paths, travel_time, obstacle.min_velocity_mps);
+    const auto predicted_obstacle_pose_max_vel =
+      calcPredictedObstaclePose(obstacle.predicted_paths, travel_time, obstacle.max_velocity_mps);
+    if (!predicted_obstacle_pose_min_vel || !predicted_obstacle_pose_max_vel) {
+      continue;
+    }
+    const PoseWithRange pose_with_range = {
+      *predicted_obstacle_pose_min_vel, *predicted_obstacle_pose_max_vel};
+
+    std::vector<geometry_msgs::msg::Point> collision_points;
+    const bool collision_detected =
+      checkCollisionWithShape(bg_poly_vehicle, pose_with_range, obstacle.shape, collision_points);
+
+    if (collision_detected) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+boost::optional<DynamicObstacle> DynamicObstacleStopModule::detectCollisionFrom(
+  const size_t first_idx, const size_t last_idx, const float start_time,
+  const std::vector<DynamicObstacle> & dynamic_obstacles, const PathWithLaneId & path) const
+{
+  if (path.points.size() - 1 == first_idx) {
+    return {};
+  }
+
+  // detect collision with obstacles from the nearest path point to the end
+  float travel_time = start_time;
+  for (size_t idx = first_idx; idx <= last_idx; idx++) {
+    const auto & p1 = path.points.at(idx - 1).point;
+    const auto & p2 = path.points.at(idx).point;
+    const float prev_vel = std::max(
+      p1.longitudinal_velocity_mps, planner_param_.dynamic_obstacle_stop.min_vel_ego_kmph / 3.6f);
+    const float ds = tier4_autoware_utils::calcDistance2d(p1, p2);
+
+    // calculate travel time from nearest point to p2
+    travel_time += ds / prev_vel;
+
+    // calculate vehicle polygon to detect collisions
+    const auto vehicle_poly = createVehiclePolygon(p2.pose);
+
+    // debug
+    {
+      std::stringstream sstream;
+      sstream << std::setprecision(4) << travel_time << "s";
+      debug_ptr_->pushDebugPolygons(vehicle_poly);
+      debug_ptr_->pushDebugTexts(sstream.str(), p2.pose, /* lateral_offset */ 3.0);
+    }
+
+    // if obstacles are detected, end the search
+    auto obstacles_collision = findCollisionObstacles(dynamic_obstacles, vehicle_poly, travel_time);
+    if (obstacles_collision.empty()) {
+      continue;
+    }
+
+    // if multiple obstacles are detected in one polygon, select the nearest obstacle from the ego
+    const auto obstacle_selected = findNearestCollisionObstacle(path, p2.pose, obstacles_collision);
+
+    // can pass the obstacle
+    if (obstacle_selected) {
+      // debug
+      std::stringstream sstream;
+      sstream << std::setprecision(4) << "ttc: " << std::to_string(travel_time) << "s";
+      debug_ptr_->pushDebugTexts(sstream.str(), obstacle_selected->nearest_collision_point);
+      debug_ptr_->pushDebugPoints(obstacle_selected->collision_points);
+      debug_ptr_->pushDebugPoints(obstacle_selected->nearest_collision_point, PointType::Red);
+
+      return *obstacle_selected;
+    }
+  }
+
+  // no obstacles are found
+  return {};
+}
+
+std::vector<DynamicObstacle> DynamicObstacleStopModule::findCollisionObstacles(
+  const std::vector<DynamicObstacle> & dynamic_obstacles,
+  const std::vector<geometry_msgs::msg::Point> & poly, const float travel_time) const
 {
   const auto bg_poly_vehicle = dynamic_obstacle_stop_utils::createBoostPolyFromMsg(poly);
 
