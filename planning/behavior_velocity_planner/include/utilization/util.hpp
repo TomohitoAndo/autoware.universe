@@ -88,7 +88,6 @@ using autoware_auto_planning_msgs::msg::PathPointWithLaneId;
 using autoware_auto_planning_msgs::msg::PathWithLaneId;
 using BasicPolygons2d = std::vector<lanelet::BasicPolygon2d>;
 using Polygons2d = std::vector<Polygon2d>;
-
 namespace planning_utils
 {
 using geometry_msgs::msg::Pose;
@@ -142,7 +141,6 @@ void setVelocityFrom(const size_t idx, const double vel, PathWithLaneId * input)
 void insertVelocity(
   PathWithLaneId & path, const PathPointWithLaneId & path_point, const double v,
   size_t & insert_index, const double min_distance = 0.001);
-void getAllPartitionLanelets(const lanelet::LaneletMapConstPtr ll, Polygons2d & polys);
 inline int64_t bitShift(int64_t original_id) { return original_id << (sizeof(int32_t) * 8 / 2); }
 
 inline double square(const double & a) { return a * a; }

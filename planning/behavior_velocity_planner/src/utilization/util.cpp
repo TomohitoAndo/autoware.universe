@@ -232,17 +232,7 @@ void insertVelocity(
   // set zero velocity from insert index
   setVelocityFromIndex(insert_index, v, &path);
 }
-void getAllPartitionLanelets(const lanelet::LaneletMapConstPtr ll, Polygons2d & polys)
-{
-  const lanelet::ConstLineStrings3d partitions = lanelet::utils::query::getAllPartitions(ll);
-  for (const auto & partition : partitions) {
-    lanelet::BasicLineString2d line;
-    for (const auto & p : partition) {
-      line.emplace_back(lanelet::BasicPoint2d{p.x(), p.y()});
-    }
-    polys.emplace_back(lanelet::BasicPolygon2d(line));
-  }
-}
+
 Polygon2d toFootprintPolygon(const autoware_auto_perception_msgs::msg::PredictedObject & object)
 {
   Polygon2d obj_footprint;

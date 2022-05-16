@@ -75,15 +75,23 @@ private:
     const std::vector<DynamicObstacle> & dynamic_obstacles,
     const PathWithLaneId & path_points) const;
 
+  boost::optional<DynamicObstacle> detectCollisionFrom(
+    const size_t first_idx, const size_t last_idx, const float start_time,
+    const std::vector<DynamicObstacle> & dynamic_obstacles, const PathWithLaneId & path) const;
+
   float calcCollisionPositionOfVehicleSide(
     const geometry_msgs::msg::Point & point, const geometry_msgs::msg::Pose & base_pose) const;
 
   std::vector<geometry_msgs::msg::Point> createVehiclePolygon(
     const geometry_msgs::msg::Pose & base_pose) const;
 
-  std::vector<DynamicObstacle> checkCollisionWithObstacles(
+  bool checkCollisionWithObstacles(
     const std::vector<DynamicObstacle> & dynamic_obstacles,
-    std::vector<geometry_msgs::msg::Point> poly, const float travel_time) const;
+    const std::vector<geometry_msgs::msg::Point> & poly, const float travel_time) const;
+
+  std::vector<DynamicObstacle> findCollisionObstacles(
+    const std::vector<DynamicObstacle> & dynamic_obstacles,
+    const std::vector<geometry_msgs::msg::Point> & poly, const float travel_time) const;
 
   boost::optional<DynamicObstacle> findNearestCollisionObstacle(
     const PathWithLaneId & path, const geometry_msgs::msg::Pose & base_pose,
