@@ -83,9 +83,6 @@ struct PointWithSearchRangeIndex
 };
 
 using Point2d = boost::geometry::model::d2::point_xy<double>;
-using autoware_auto_planning_msgs::msg::PathPointWithLaneId;
-using autoware_auto_planning_msgs::msg::PathWithLaneId;
-using Polygons2d = std::vector<lanelet::BasicPolygon2d>;
 using autoware_auto_planning_msgs::msg::PathPoint;
 using autoware_auto_planning_msgs::msg::PathPointWithLaneId;
 using autoware_auto_planning_msgs::msg::PathWithLaneId;
