@@ -201,31 +201,46 @@ boost::optional<DynamicObstacle> DynamicObstacleStopModule::detectCollision(
       debug_ptr_->pushDebugTexts(sstream.str(), p2.pose, /* lateral_offset */ 3.0);
     }
 
-    const auto collision_detected =
-      checkCollisionWithObstacles(dynamic_obstacles, vehicle_poly, travel_time);
+    boost::optional<DynamicObstacle> obstacle_selected;
+    // search densely around the obstacle
+    if (planner_param_.dynamic_obstacle_stop.enable_densely_search) {
+      const auto collision_detected =
+        checkCollisionWithObstacles(dynamic_obstacles, vehicle_poly, travel_time);
 
-    if (!collision_detected) {
-      prev_idx = idx;
-      prev_travel_time = travel_time;
-      continue;
-    }
+      if (!collision_detected) {
+        prev_idx = idx;
+        prev_travel_time = travel_time;
+        continue;
+      }
 
-    // obstacles are detected, so search more densely from previous search
-    // prev_idx is already searched, so start from prev_idx + 1
-    auto obstacle_selected =
-      detectCollisionFrom(prev_idx + 1, idx, prev_travel_time, dynamic_obstacles, path);
-    if (!obstacle_selected) {
-      continue;
+      // obstacles are detected, so search more densely from previous search
+      // prev_idx is already searched, so start from prev_idx + 1
+      obstacle_selected =
+        detectCollisionFrom(prev_idx + 1, idx, prev_travel_time, dynamic_obstacles, path);
+      if (!obstacle_selected) {
+        continue;
+      }
+    } else {
+      auto obstacles_collision =
+        findCollisionObstacles(dynamic_obstacles, vehicle_poly, travel_time);
+      if (obstacles_collision.empty()) {
+        continue;
+      }
+
+      obstacle_selected = findNearestCollisionObstacle(path, p2.pose, obstacles_collision);
+      if (!obstacle_selected) {
+        continue;
+      }
     }
 
     // debug
-    // {
-    //   std::stringstream sstream;
-    //   sstream << std::setprecision(4) << "ttc: " << std::to_string(travel_time) << "s";
-    //   debug_ptr_->pushDebugTexts(sstream.str(), obstacle_selected->nearest_collision_point);
-    //   debug_ptr_->pushDebugPoints(obstacle_selected->collision_points);
-    //   debug_ptr_->pushDebugPoints(obstacle_selected->nearest_collision_point, PointType::Red);
-    // }
+    {
+      std::stringstream sstream;
+      sstream << std::setprecision(4) << "ttc: " << std::to_string(travel_time) << "s";
+      debug_ptr_->pushDebugTexts(sstream.str(), obstacle_selected->nearest_collision_point);
+      debug_ptr_->pushDebugPoints(obstacle_selected->collision_points);
+      debug_ptr_->pushDebugPoints(obstacle_selected->nearest_collision_point, PointType::Red);
+    }
 
     return obstacle_selected;
   }
