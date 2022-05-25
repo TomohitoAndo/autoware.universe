@@ -106,8 +106,14 @@ rcl_interfaces::msg::SetParametersResult DynamicObstacleStopModuleManager::param
   try {
     std::string ns = "dynamic_obstacle_stop.";
     tier4_autoware_utils::updateParam(
+      parameters, ns + "use_partition_lanelet",
+      planner_param_.dynamic_obstacle_stop.use_partition_lanelet);
+    tier4_autoware_utils::updateParam(
       parameters, ns + "specify_decel_jerk",
       planner_param_.dynamic_obstacle_stop.specify_decel_jerk);
+    tier4_autoware_utils::updateParam(
+      parameters, ns + "enable_densely_search",
+      planner_param_.dynamic_obstacle_stop.enable_densely_search);
     tier4_autoware_utils::updateParam(
       parameters, ns + "stop_margin", planner_param_.dynamic_obstacle_stop.stop_margin);
     tier4_autoware_utils::updateParam(
