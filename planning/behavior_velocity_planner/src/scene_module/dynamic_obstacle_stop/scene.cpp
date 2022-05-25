@@ -139,11 +139,17 @@ Polygons2d DynamicObstacleStopModule::createDetectionAreaPolygon(
   const auto & p = planner_param_;
   const double obstacle_vel_mps = p.dynamic_obstacle.max_vel_kmph / 3.6;
   da_range.interval = p.dynamic_obstacle_stop.detection_distance;
-  da_range.min_longitudinal_distance = p.vehicle_param.base_to_front;
+
+  // for experiment: add safe margin
+  const double min_longitudinal_margin = -0.5;
+  const double max_longitudinal_margin = 0.5;
+
+  da_range.min_longitudinal_distance = p.vehicle_param.base_to_front + min_longitudinal_margin;
   // set minimum distance to avoid hunting of detection
   const double limited_longitudinal_dist = p.dynamic_obstacle_stop.stop_margin + 1.0;
-  da_range.max_longitudinal_distance =
-    std::max(*stop_dist + p.dynamic_obstacle_stop.stop_margin, limited_longitudinal_dist);
+  da_range.max_longitudinal_distance = std::max(
+    *stop_dist + p.dynamic_obstacle_stop.stop_margin + max_longitudinal_margin,
+    limited_longitudinal_dist);
   da_range.min_lateral_distance = p.vehicle_param.width / 2.0;
   da_range.max_lateral_distance = obstacle_vel_mps * p.dynamic_obstacle.max_prediction_time;
   Polygons2d detection_area_poly;
