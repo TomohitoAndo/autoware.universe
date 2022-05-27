@@ -188,6 +188,39 @@ def launch_setup(context, *args, **kwargs):
         extra_arguments=[{"use_intra_process_comms": LaunchConfiguration("use_intra_process")}],
     )
 
+    # smoother param
+    common_param_path = os.path.join(
+        get_package_share_directory("tier4_planning_launch"),
+        "config",
+        "scenario_planning",
+        "common",
+        "common.param.yaml",
+    )
+    with open(common_param_path, "r") as f:
+        common_param = yaml.safe_load(f)["/**"]["ros__parameters"]
+
+    base_param_path = os.path.join(
+        get_package_share_directory("tier4_planning_launch"),
+        "config",
+        "scenario_planning",
+        "common",
+        "motion_velocity_smoother",
+        "motion_velocity_smoother.param.yaml",
+    )
+    with open(base_param_path, "r") as f:
+        base_param = yaml.safe_load(f)["/**"]["ros__parameters"]
+
+    smoother_param_path = os.path.join(
+        get_package_share_directory("tier4_planning_launch"),
+        "config",
+        "scenario_planning",
+        "common",
+        "motion_velocity_smoother",
+        "Analytical.param.yaml",
+    )
+    with open(smoother_param_path, "r") as f:
+        smoother_param = yaml.safe_load(f)["/**"]["ros__parameters"]
+
     # behavior velocity planner
     blind_spot_param_path = os.path.join(
         get_package_share_directory("tier4_planning_launch"),
@@ -360,6 +393,9 @@ def launch_setup(context, *args, **kwargs):
             occlusion_spot_param,
             no_stopping_area_param,
             vehicle_info_param,
+            common_param,
+            base_param,
+            smoother_param,
         ],
         extra_arguments=[{"use_intra_process_comms": LaunchConfiguration("use_intra_process")}],
     )
