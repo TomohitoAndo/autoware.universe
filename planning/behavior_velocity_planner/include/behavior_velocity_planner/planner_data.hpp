@@ -18,6 +18,9 @@
 #include "route_handler/route_handler.hpp"
 
 #include <motion_velocity_smoother/smoother/analytical_jerk_constrained_smoother/analytical_jerk_constrained_smoother.hpp>
+#include <motion_velocity_smoother/smoother/jerk_filtered_smoother.hpp>
+#include <motion_velocity_smoother/smoother/l2_pseudo_jerk_smoother.hpp>
+#include <motion_velocity_smoother/smoother/linf_pseudo_jerk_smoother.hpp>
 #include <motion_velocity_smoother/smoother/smoother_base.hpp>
 #include <vehicle_info_util/vehicle_info_util.hpp>
 

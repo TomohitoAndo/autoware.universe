@@ -210,14 +210,9 @@ def launch_setup(context, *args, **kwargs):
     with open(base_param_path, "r") as f:
         base_param = yaml.safe_load(f)["/**"]["ros__parameters"]
 
-    smoother_param_path = os.path.join(
-        get_package_share_directory("tier4_planning_launch"),
-        "config",
-        "scenario_planning",
-        "common",
-        "motion_velocity_smoother",
-        "Analytical.param.yaml",
-    )
+
+    # smoother parameter
+    smoother_param_path = LaunchConfiguration("smoother_param_file").perform(context)
     with open(smoother_param_path, "r") as f:
         smoother_param = yaml.safe_load(f)["/**"]["ros__parameters"]
 
@@ -382,6 +377,7 @@ def launch_setup(context, *args, **kwargs):
             ("~/output/traffic_signal", "debug/traffic_signal"),
         ],
         parameters=[
+            {"smoother_type": LaunchConfiguration("smoother_type")},
             behavior_velocity_planner_param,
             blind_spot_param,
             crosswalk_param,
@@ -459,6 +455,16 @@ def generate_launch_description():
     # component
     add_launch_arg("use_intra_process", "false", "use ROS2 component container communication")
     add_launch_arg("use_multithread", "false", "use multithread")
+
+    # smoother param
+    add_launch_arg("smoother_type", "JerkFiltered", "options: JerkFiltered, L2, Analytical, Linf")
+    add_launch_arg("smoother_param_file",
+        [
+            FindPackageShare("tier4_planning_launch"),
+            "/config/scenario_planning/common/motion_velocity_smoother/JerkFiltered.param.yaml",
+        ],
+        "path to the parameter file of smoother",
+    )
 
     set_container_executable = SetLaunchConfiguration(
         "container_executable",

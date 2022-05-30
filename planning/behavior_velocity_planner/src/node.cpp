@@ -147,6 +147,7 @@ BehaviorVelocityPlannerNode::BehaviorVelocityPlannerNode(const rclcpp::NodeOptio
     createSubscriptionOptions(this));
 
   // set velocity smoother param
+  smoother_type_ = this->declare_parameter("smoother_type", "JerkFiltered");
   onParam();
 
   // Publishers
@@ -304,8 +305,28 @@ void BehaviorVelocityPlannerNode::onVehicleVelocity(
 
 void BehaviorVelocityPlannerNode::onParam()
 {
-  planner_data_.velocity_smoother_ =
-    std::make_unique<motion_velocity_smoother::AnalyticalJerkConstrainedSmoother>(*this);
+  if (smoother_type_ == "JerkFiltered") {
+    planner_data_.velocity_smoother_ =
+      std::make_unique<motion_velocity_smoother::JerkFilteredSmoother>(*this);
+    return;
+  }
+  if (smoother_type_ == "L2") {
+    planner_data_.velocity_smoother_ =
+      std::make_unique<motion_velocity_smoother::L2PseudoJerkSmoother>(*this);
+    return;
+  }
+  if (smoother_type_ == "Linf") {
+    planner_data_.velocity_smoother_ =
+      std::make_unique<motion_velocity_smoother::LinfPseudoJerkSmoother>(*this);
+    return;
+  }
+  if (smoother_type_ == "Analytical") {
+    planner_data_.velocity_smoother_ =
+      std::make_unique<motion_velocity_smoother::AnalyticalJerkConstrainedSmoother>(*this);
+    return;
+  }
+
+  throw std::domain_error("[BehaviorVelocityPlanner] undesired smoother algorithm is selected.");
   return;
 }
 

@@ -3,6 +3,9 @@
   <arg name="common_param_path"/>
   <arg name="vehicle_info_param_file"/>
 
+  <!-- motion velocity smoother param -->
+  <arg name="smoother_type"/>
+
   <!-- lane_driving scenario -->
   <group>
     <push-ros-namespace namespace="lane_driving"/>
@@ -12,6 +15,8 @@
       <include file="$(find-pkg-share tier4_planning_launch)/launch/scenario_planning/lane_driving/behavior_planning/behavior_planning.launch.py">
         <arg name="vehicle_info_param_file" value="$(var vehicle_info_param_file)"/>
         <arg name="use_multithread" value="true"/>
+        <arg name="smoother_type" value="$(var smoother_type)"/>
+        <arg name="smoother_param_path" value="$(find-pkg-share tier4_planning_launch)/config/scenario_planning/common/motion_velocity_smoother/$(var smoother_type).param.yaml"/>
       </include>
     </group>
 
