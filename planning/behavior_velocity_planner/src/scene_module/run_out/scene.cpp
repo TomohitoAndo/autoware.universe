@@ -22,6 +22,31 @@ namespace behavior_velocity_planner
 {
 namespace bg = boost::geometry;
 
+// todo: remove
+void RunOutModule::visualizeFilter(const Polygons2d & polys)
+{
+  namespace bg = boost::geometry;
+
+  if (polys.empty()) {
+    return;
+  }
+
+  for (const auto & poly : polys) {
+    const auto bb = bg::return_envelope<tier4_autoware_utils::Box2d>(poly);
+    const auto bb_min = bb.min_corner();
+    const auto bb_max = bb.max_corner();
+
+    std::vector<geometry_msgs::msg::Point> bb_poly;
+    bb_poly.push_back(tier4_autoware_utils::createPoint(bb_min.x(), bb_min.y(), 0));
+    bb_poly.push_back(tier4_autoware_utils::createPoint(bb_min.x(), bb_max.y(), 0));
+    bb_poly.push_back(tier4_autoware_utils::createPoint(bb_max.x(), bb_max.y(), 0));
+    bb_poly.push_back(tier4_autoware_utils::createPoint(bb_max.x(), bb_min.y(), 0));
+    debug_ptr_->pushDebugPolygons(bb_poly);
+  }
+
+  return;
+}
+
 RunOutModule::RunOutModule(
   const int64_t module_id, const std::shared_ptr<const PlannerData> & planner_data,
   const PlannerParam & planner_param, const rclcpp::Logger logger,
@@ -71,9 +96,13 @@ bool RunOutModule::modifyPathVelocity(
     run_out_utils::trimPathFromSelfPose(extended_smoothed_path, current_pose, trim_distance);
 
   // create abstracted dynamic obstacles from objects or points
-  dynamic_obstacle_creator_->setData(*planner_data_, *path);
+  const auto detection_area_poly = createDetectionAreaPolygon(extended_smoothed_path);
+  dynamic_obstacle_creator_->setData(*planner_data_, *path, detection_area_poly);
   const auto dynamic_obstacles = dynamic_obstacle_creator_->createDynamicObstacles();
   debug_ptr_->setDebugValues(DebugValues::TYPE::NUM_OBSTACLES, dynamic_obstacles.size());
+
+  // debug
+  visualizeFilter(detection_area_poly);
 
   // extract obstacles using lanelet information
   const auto partition_excluded_obstacles =
@@ -109,7 +138,6 @@ bool RunOutModule::modifyPathVelocity(
     applyMaxJerkLimit(current_pose, current_vel, current_acc, *path);
   }
 
-  visualizeDetectionArea(trim_smoothed_path);
   publishDebugValue(
     trim_smoothed_path, partition_excluded_obstacles, dynamic_obstacle, current_pose);
 
@@ -123,27 +151,16 @@ bool RunOutModule::modifyPathVelocity(
   return true;
 }
 
-pcl::PointCloud<pcl::PointXYZ> RunOutModule::extractObstaclePointsWithRectangle(
-  const pcl::PointCloud<pcl::PointXYZ> & input_points,
-  const geometry_msgs::msg::Pose & current_pose) const
-{
-  const auto detection_area_polygon =
-    createDetectionAreaPolygon(current_pose, planner_param_.detection_area);
-
-  debug_ptr_->pushDebugPolygons(detection_area_polygon);
-
-  const auto extracted_points = pointsWithinPolygon(detection_area_polygon, input_points);
-
-  return extracted_points;
-}
-
-void RunOutModule::visualizeDetectionArea(const PathWithLaneId & smoothed_path) const
+Polygons2d RunOutModule::createDetectionAreaPolygon(const PathWithLaneId & smoothed_path) const
 {
   // calculate distance needed to stop with jerk and acc constraints
   const float initial_vel = planner_data_->current_velocity->twist.linear.x;
   const float initial_acc = planner_data_->current_accel.get();
   const float target_vel = 0.0;
-  const float jerk_dec = planner_param_.run_out.deceleration_jerk;
+  const float jerk_dec_max = -0.1;
+  const float jerk_dec = planner_param_.run_out.specify_decel_jerk
+                           ? planner_param_.run_out.deceleration_jerk
+                           : jerk_dec_max;
   const float jerk_acc = std::abs(jerk_dec);
   const float planning_dec = jerk_dec < planner_param_.common.normal_min_jerk
                                ? planner_param_.common.limit_min_acc
@@ -152,25 +169,40 @@ void RunOutModule::visualizeDetectionArea(const PathWithLaneId & smoothed_path) 
     initial_vel, target_vel, initial_acc, planning_dec, jerk_acc, jerk_dec);
 
   if (!stop_dist) {
-    return;
+    *stop_dist = 0;
   }
 
+  // create detection area polygon
   DetectionRange da_range;
-  const float obstacle_vel_mps = planner_param_.dynamic_obstacle.max_vel_kmph / 3.6;
-  da_range.interval = planner_param_.run_out.detection_distance;
-  da_range.min_longitudinal_distance = planner_param_.vehicle_param.base_to_front;
-  da_range.max_longitudinal_distance = *stop_dist + planner_param_.run_out.stop_margin;
-  da_range.min_lateral_distance = planner_param_.vehicle_param.width / 2.0;
-  da_range.max_lateral_distance =
-    obstacle_vel_mps * planner_param_.dynamic_obstacle.max_prediction_time;
+  const auto & p = planner_param_;
+  const double behind_margin = 0.5;
+  const double ahead_margin = 1.0;
+  const double obstacle_vel_mps = p.dynamic_obstacle.max_vel_kmph / 3.6;
+  da_range.interval = p.run_out.detection_distance;
+  da_range.min_longitudinal_distance = p.vehicle_param.base_to_front - behind_margin;
+  da_range.max_longitudinal_distance =
+    *stop_dist + planner_param_.run_out.stop_margin + ahead_margin;
+  da_range.min_lateral_distance = p.vehicle_param.width / 2.0;
+  da_range.max_lateral_distance = obstacle_vel_mps * p.dynamic_obstacle.max_prediction_time;
   Polygons2d detection_area_poly;
   planning_utils::createDetectionAreaPolygons(
     detection_area_poly, smoothed_path, planner_data_->current_pose.pose, da_range,
-    planner_param_.dynamic_obstacle.max_vel_kmph / 3.6);
+    p.dynamic_obstacle.max_vel_kmph / 3.6);
 
   for (const auto & poly : detection_area_poly) {
     debug_ptr_->pushDetectionAreaPolygons(poly);
   }
+
+  // debug
+  for (const auto & p : smoothed_path.points) {
+    // debug_ptr_->pushDebugPoints(p.point.pose.position);
+
+    std::stringstream sstream;
+    sstream << std::setprecision(4) << p.point.longitudinal_velocity_mps * 3.6 << "km/h";
+    debug_ptr_->pushDebugTexts(sstream.str(), p.point.pose, /* lateral_offset */ -3.0);
+  }
+
+  return detection_area_poly;
 }
 
 pcl::PointCloud<pcl::PointXYZ> RunOutModule::pointsWithinPolygon(
@@ -228,7 +260,7 @@ boost::optional<DynamicObstacle> RunOutModule::detectCollision(
 
     // debug
     {
-      debug_ptr_->pushDebugPolygons(vehicle_poly);
+      // debug_ptr_->pushDebugPolygons(vehicle_poly);
       std::stringstream sstream;
       sstream << std::setprecision(4) << travel_time << "s";
       debug_ptr_->pushDebugTexts(sstream.str(), p2.pose, /* lateral_offset */ 3.0);

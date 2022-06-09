@@ -19,6 +19,10 @@
         dist_behind: 5.0 # [m] behind distance from ego position
         dist_right: 7.0  # [m] right distance from ego position
         dist_left: 7.0   # [m] left distance from ego position
+      
+      detection_area:
+        behind_margin: 0.5
+        ahead_margin: 1.0
 
       # parameter to create abstracted dynamic obstacles
       dynamic_obstacle:

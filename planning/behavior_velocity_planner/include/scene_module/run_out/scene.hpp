@@ -72,6 +72,8 @@ private:
 
   void visualizeDetectionArea(const PathWithLaneId & smoothed_path) const;
 
+  Polygons2d createDetectionAreaPolygon(const PathWithLaneId & smoothed_path) const;
+
   pcl::PointCloud<pcl::PointXYZ> pointsWithinPolygon(
     const std::vector<geometry_msgs::msg::Point> & polygon,
     const pcl::PointCloud<pcl::PointXYZ> & candidate_points) const;
@@ -152,6 +154,9 @@ private:
     const PathWithLaneId & path, const std::vector<DynamicObstacle> extracted_obstacles,
     const boost::optional<DynamicObstacle> & dynamic_obstacle,
     const geometry_msgs::msg::Pose & current_pose) const;
+
+  // todo: remove
+  void visualizeFilter(const Polygons2d & polys);
 };
 }  // namespace behavior_velocity_planner
 

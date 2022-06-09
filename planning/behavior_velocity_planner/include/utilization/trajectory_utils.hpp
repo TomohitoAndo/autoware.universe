@@ -161,7 +161,7 @@ inline bool smoothPath(
     const size_t nearest_seg_idx = traj_with_ego_point_with_idx->second;
     //! insert ego projected pose on path so new nearest segment will be nearest_seg_idx + 1
     traj_with_ego_point_on_path.insert(
-      traj_with_ego_point_on_path.begin() + nearest_seg_idx, ego_point_on_path);
+      traj_with_ego_point_on_path.begin() + nearest_seg_idx + 1, ego_point_on_path);
 
     // ego point inserted is new nearest point
     nearest_idx = nearest_seg_idx + 1;
