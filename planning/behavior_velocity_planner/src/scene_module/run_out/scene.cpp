@@ -203,6 +203,10 @@ boost::optional<DynamicObstacle> RunOutModule::detectCollision(
     return {};
   }
 
+  // debug
+  std::vector<geometry_msgs::msg::Point> debug_line1;
+  std::vector<geometry_msgs::msg::Point> debug_line2;
+
   // detect collision with obstacles from the nearest path point to the end
   // ignore the travel time from current pose to nearest path point?
   float travel_time = 0.0;
@@ -223,6 +227,26 @@ boost::optional<DynamicObstacle> RunOutModule::detectCollision(
       continue;
     }
     dist_sum = 0.0;
+
+    // debug
+    const auto & p = planner_param_;
+    const double lateral_dist = (p.dynamic_obstacle.max_vel_kmph / 3.6) * travel_time;
+    debug_line1.push_back(tier4_autoware_utils::calcOffsetPose(
+                            p2.pose, p.vehicle_param.base_to_front - p.run_out.detection_span,
+                            p.vehicle_param.width / 2.0 + lateral_dist, 0)
+                            .position);
+    debug_line1.push_back(
+      tier4_autoware_utils::calcOffsetPose(
+        p2.pose, p.vehicle_param.base_to_front, p.vehicle_param.width / 2.0 + lateral_dist, 0)
+        .position);
+    debug_line2.push_back(tier4_autoware_utils::calcOffsetPose(
+                            p2.pose, p.vehicle_param.base_to_front - p.run_out.detection_span,
+                            -p.vehicle_param.width / 2.0 - lateral_dist, 0)
+                            .position);
+    debug_line2.push_back(
+      tier4_autoware_utils::calcOffsetPose(
+        p2.pose, p.vehicle_param.base_to_front, -p.vehicle_param.width / 2.0 - lateral_dist, 0)
+        .position);
 
     const auto vehicle_poly = createVehiclePolygon(p2.pose);
 
@@ -254,8 +278,16 @@ boost::optional<DynamicObstacle> RunOutModule::detectCollision(
       debug_ptr_->pushDebugPoints(obstacle_selected->nearest_collision_point, PointType::Red);
     }
 
+    // debug
+    debug_ptr_->pushDebugLines(debug_line1);
+    debug_ptr_->pushDebugLines(debug_line2);
+
     return obstacle_selected;
   }
+
+  // debug
+  debug_ptr_->pushDebugLines(debug_line1);
+  debug_ptr_->pushDebugLines(debug_line2);
 
   // no collision detected
   return {};
