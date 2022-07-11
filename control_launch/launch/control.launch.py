@@ -294,7 +294,7 @@ def generate_launch_description():
         ],
         "path to the parameter file of longitudinal controller for vehicle simulation",
     )
-
+    add_launch_arg(
         "vehicle_cmd_gate_param_path",
         [
             FindPackageShare("control_launch"),
