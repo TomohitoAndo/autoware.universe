@@ -30,10 +30,23 @@ import yaml
 
 
 def launch_setup(context, *args, **kwargs):
-    lat_controller_param_path = LaunchConfiguration("lat_controller_param_path").perform(context)
+    vehicle_simulation = LaunchConfiguration("vehicle_simulation").perform(context)
+    if vehicle_simulation == "true":
+        lat_controller_param_path = LaunchConfiguration(
+            "lat_controller_param_path_for_vehicle_sim"
+        ).perform(context)
+        lon_controller_param_path = LaunchConfiguration(
+            "lon_controller_param_path_for_vehicle_sim"
+        ).perform(context)
+    else:
+        lat_controller_param_path = LaunchConfiguration("lat_controller_param_path").perform(
+            context
+        )
+        lon_controller_param_path = LaunchConfiguration("lon_controller_param_path").perform(
+            context
+        )
     with open(lat_controller_param_path, "r") as f:
         lat_controller_param = yaml.safe_load(f)["/**"]["ros__parameters"]
-    lon_controller_param_path = LaunchConfiguration("lon_controller_param_path").perform(context)
     with open(lon_controller_param_path, "r") as f:
         lon_controller_param = yaml.safe_load(f)["/**"]["ros__parameters"]
     vehicle_cmd_gate_param_path = LaunchConfiguration("vehicle_cmd_gate_param_path").perform(
@@ -258,6 +271,14 @@ def generate_launch_description():
         "path to the parameter file of lateral controller. default is `mpc_follower`",
     )
     add_launch_arg(
+        "lat_controller_param_path_for_vehicle_sim",
+        [
+            FindPackageShare("control_launch"),
+            "/config/trajectory_follower/mpc_follower_for_vehicle_sim.param.yaml",
+        ],
+        "path to the parameter file of lateral controller for vehicle simulation. default is `mpc_follower`",
+    )
+    add_launch_arg(
         "lon_controller_param_path",
         [
             FindPackageShare("control_launch"),
@@ -266,6 +287,14 @@ def generate_launch_description():
         "path to the parameter file of longitudinal controller",
     )
     add_launch_arg(
+        "lon_controller_param_path_for_vehicle_sim",
+        [
+            FindPackageShare("control_launch"),
+            "/config/trajectory_follower/longitudinal_controller_for_vehicle_sim.param.yaml",
+        ],
+        "path to the parameter file of longitudinal controller for vehicle simulation",
+    )
+
         "vehicle_cmd_gate_param_path",
         [
             FindPackageShare("control_launch"),
@@ -286,10 +315,13 @@ def generate_launch_description():
         "path to the parameter file of vehicle_cmd_gate",
     )
 
+    # vehicle simulation mode
+    add_launch_arg("vehicle_simulation", "false", "run on vehicle simulator")
+
     # vehicle cmd gate
-    add_launch_arg("use_emergency_handling", "false", "use emergency handling")
+    add_launch_arg("use_emergency_handling", "true", "use emergency handling")
     add_launch_arg("use_external_emergency_stop", "true", "use external emergency stop")
-    add_launch_arg("use_start_request", "false", "use start request service")
+    add_launch_arg("use_start_request", "true", "use start request service")
 
     # external cmd selector
     add_launch_arg("initial_selector_mode", "remote", "local or remote")
