@@ -14,5 +14,5 @@
     backward_path_length: 5.0
     max_accel: -2.8
     max_jerk: -5.0
-    system_delay: 0.5
+    system_delay: 3.0
     delay_response_time: 1.3
