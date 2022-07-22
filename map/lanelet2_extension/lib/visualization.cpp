@@ -799,6 +799,25 @@ visualization_msgs::msg::MarkerArray visualization::parkingSpacesAsMarkerArray(
   return marker_array;
 }
 
+visualization_msgs::msg::MarkerArray visualization::noDetectionAreaAsMarkerArray(
+  const lanelet::ConstPolygons3d & no_detection_area, const std_msgs::msg::ColorRGBA & c)
+{
+  visualization_msgs::msg::MarkerArray marker_array;
+  if (no_detection_area.empty()) {
+    return marker_array;
+  }
+
+  visualization_msgs::msg::Marker marker = createPolygonMarker("no_detection_area", c);
+  for (const auto & polygon : no_detection_area) {
+    pushPolygonMarker(&marker, polygon, c);
+  }
+
+  if (!marker.points.empty()) {
+    marker_array.markers.push_back(marker);
+  }
+  return marker_array;
+}
+
 visualization_msgs::msg::MarkerArray visualization::generateLaneletIdMarker(
   const lanelet::ConstLanelets road_lanelets, const std_msgs::msg::ColorRGBA c, const double scale)
 {

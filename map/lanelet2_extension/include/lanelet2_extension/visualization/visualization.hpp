@@ -254,6 +254,14 @@ visualization_msgs::msg::MarkerArray parkingSpacesAsMarkerArray(
   const lanelet::ConstLineStrings3d & parking_spaces, const std_msgs::msg::ColorRGBA & c);
 
 /**
+ * [NoDetectionAreaAsMarkerArray creates marker array to visualize no detection area]
+ * @param  no_detection_area [no detection area polygon]
+ * @param  c                 [color of the marker]
+ */
+visualization_msgs::msg::MarkerArray noDetectionAreaAsMarkerArray(
+  const lanelet::ConstPolygons3d & no_detection_area, const std_msgs::msg::ColorRGBA & c);
+
+/**
  * [detectionAreasAsMarkerArray creates marker array to visualize lanelet_id]
  * @param road_lanelets [road lanelets]
  * @param c [color of the marker]
