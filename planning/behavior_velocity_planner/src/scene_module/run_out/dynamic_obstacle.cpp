@@ -105,6 +105,86 @@ pcl::PointCloud<pcl::PointXYZ> extractObstaclePointsWithinPolygon(
 
   return output_points;
 }
+
+// NOTE: path_points must have points with constant interval
+std::vector<pcl::PointCloud<pcl::PointXYZ>> groupPointsWithLongitudinalDistance(
+  const pcl::PointCloud<pcl::PointXYZ> & input_points, const PathPointsWithLaneId & path_points,
+  const double interval)
+{
+  // assign index with interval
+  // example:
+  //   longitudinal distance = 0.35, interval = 0.1 -> index is 3
+  std::vector<pcl::PointCloud<pcl::PointXYZ>> points_with_index;
+  // const auto path_length = tier4_autoware_utils::calcArcLength(path_points);
+  // const size_t index_size = std::floor(path_length / interval) + 1;
+  // points_with_index.resize(index_size);
+  points_with_index.resize(path_points.size());
+
+  const auto front_path_point = path_points.front().point.pose.position;
+  for (const auto & p : input_points.points) {
+    const auto arc_length = tier4_autoware_utils::calcSignedArcLength(
+      path_points, front_path_point, tier4_autoware_utils::createPoint(p.x, p.y, p.z));
+    if (arc_length < 0) {
+      continue;
+    }
+
+    const size_t index = std::floor(arc_length / interval);
+    if (index >= points_with_index.size()) {
+      continue;
+    }
+
+    points_with_index.at(index).points.push_back(p);
+  }
+
+  return points_with_index;
+}
+
+pcl::PointXYZ calculateLateralNearestPoint(
+  const pcl::PointCloud<pcl::PointXYZ> & input_points, const geometry_msgs::msg::Pose & base_pose)
+{
+  const auto lateral_nearest_point = std::min_element(
+    input_points.points.begin(), input_points.points.end(), [&](const auto & p1, const auto & p2) {
+      const auto lateral_deviation_p1 = tier4_autoware_utils::calcLateralDeviation(
+        base_pose, tier4_autoware_utils::createPoint(p1.x, p1.y, p1.x));
+      const auto lateral_deviation_p2 = tier4_autoware_utils::calcLateralDeviation(
+        base_pose, tier4_autoware_utils::createPoint(p2.x, p2.y, p2.x));
+      return lateral_deviation_p1 < lateral_deviation_p2;
+    });
+
+  return *lateral_nearest_point;
+}
+
+pcl::PointCloud<pcl::PointXYZ> selectLateralNearestPoints(
+  const std::vector<pcl::PointCloud<pcl::PointXYZ>> & points_with_index,
+  const PathPointsWithLaneId & path_points)
+{
+  pcl::PointCloud<pcl::PointXYZ> lateral_nearest_points;
+  for (size_t idx = 0; idx < points_with_index.size(); idx++) {
+    lateral_nearest_points.push_back(
+      calculateLateralNearestPoint(points_with_index.at(idx), path_points.at(idx).point.pose));
+  }
+
+  return lateral_nearest_points;
+}
+
+pcl::PointCloud<pcl::PointXYZ> extractLateralNearestPoints(
+  const pcl::PointCloud<pcl::PointXYZ> & input_points, const PathPointsWithLaneId & path_points,
+  const double interval)
+{
+  // interpolate path points with interval
+  // TODO: implement
+  const auto interpolated_path_points = path_points;
+
+  // divide points into groups according to longitudinal distance
+  const auto points_with_index =
+    groupPointsWithLongitudinalDistance(input_points, interpolated_path_points, interval);
+
+  // select the lateral nearest point for each group
+  const auto lateral_nearest_points =
+    selectLateralNearestPoints(points_with_index, interpolated_path_points);
+
+  return lateral_nearest_points;
+}
 }  // namespace
 
 DynamicObstacleCreatorForObject::DynamicObstacleCreatorForObject(rclcpp::Node & node)
@@ -253,9 +333,18 @@ void DynamicObstacleCreatorForPoints::onCompareMapFilteredPointCloud(
   pcl::PointCloud<pcl::PointXYZ>::Ptr pc_transformed(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::transformPointCloud(pc, *pc_transformed, affine);
 
+  // apply voxel grid filter to reduce calculation cost
   const auto voxel_grid_filtered_points = applyVoxelGridFilter(pc_transformed);
+
+  // filter obstacle points within detection area polygon
+  const auto & d = dynamic_obstacle_data_;
+  const auto detection_area_filtered_points =
+    extractObstaclePointsWithinPolygon(voxel_grid_filtered_points, d.detection_area_polygon);
+
+  // filter points that have lateral nearest distance
+  // TODO(Tomohito Ando): change the name of `compare_map_filtered_pointcloud`
   std::lock_guard<std::mutex> lock(mutex_);
-  dynamic_obstacle_data_.compare_map_filtered_pointcloud = extractObstaclePointsWithinPolygon(
-    voxel_grid_filtered_points, dynamic_obstacle_data_.detection_area_polygon);
+  dynamic_obstacle_data_.compare_map_filtered_pointcloud =
+    extractLateralNearestPoints(detection_area_filtered_points, d.path.points, 0.1);
 }
 }  // namespace behavior_velocity_planner
