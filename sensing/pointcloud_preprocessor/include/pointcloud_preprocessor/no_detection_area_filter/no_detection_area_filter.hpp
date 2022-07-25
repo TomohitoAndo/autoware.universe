@@ -63,6 +63,7 @@ private:
   rclcpp::Subscription<PointCloud2>::SharedPtr pointcloud_sub_;
   rclcpp::Publisher<PointCloud2>::SharedPtr filtered_pointcloud_pub_;
   rclcpp::Publisher<tier4_debug_msgs::msg::Float32Stamped>::SharedPtr debug_pub_;
+  rclcpp::Publisher<tier4_debug_msgs::msg::Float32Stamped>::SharedPtr debug_pub2_;
 
   lanelet::LaneletMapPtr lanelet_map_ptr_;
   lanelet::ConstPolygons3d no_detection_area_lanelets_;

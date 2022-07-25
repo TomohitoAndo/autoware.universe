@@ -18,9 +18,6 @@
 
 #include <pcl_ros/transforms.hpp>
 
-#include <boost/geometry/algorithms/convex_hull.hpp>
-#include <boost/geometry/algorithms/intersects.hpp>
-
 #include <lanelet2_core/geometry/Polygon.h>
 #include <tf2_ros/create_timer_ros.h>
 
@@ -42,6 +39,34 @@ bool pointWithinLanelets(const Point2d & point, const lanelet::ConstPolygons3d &
 
   return false;
 }
+
+tier4_autoware_utils::Box2d calcBoundingBox(
+  const pcl::PointCloud<pcl::PointXYZ>::ConstPtr & input_cloud)
+{
+  MultiPoint2d candidate_points;
+  for (const auto & p : input_cloud->points) {
+    candidate_points.emplace_back(p.x, p.y);
+  }
+
+  // const auto envelope_box =
+  //   boost::geometry::return_envelope<tier4_autoware_utils::Box2d>(candidate_points);
+
+  // return envelope_box;
+  return boost::geometry::return_envelope<tier4_autoware_utils::Box2d>(candidate_points);
+}
+
+lanelet::ConstPolygons3d calcIntersectedPolygons(
+  const tier4_autoware_utils::Box2d & bounding_box, const lanelet::ConstPolygons3d & polygons)
+{
+  lanelet::ConstPolygons3d intersected_polygons;
+  for (const auto & polygon : polygons) {
+    if (boost::geometry::intersects(bounding_box, lanelet::utils::to2D(polygon).basicPolygon())) {
+      intersected_polygons.push_back(polygon);
+    }
+  }
+  return intersected_polygons;
+}
+
 }  // anonymous namespace
 
 namespace pointcloud_preprocessor
@@ -58,7 +83,9 @@ NoDetectionAreaFilterComponent::NoDetectionAreaFilterComponent(
       this->create_publisher<PointCloud2>("output", rclcpp::SensorDataQoS());
 
     debug_pub_ =
-      this->create_publisher<tier4_debug_msgs::msg::Float32Stamped>("~/debug/execution_time", 1);
+      this->create_publisher<tier4_debug_msgs::msg::Float32Stamped>("~/debug/processing_time", 1);
+    debug_pub2_ =
+      this->create_publisher<tier4_debug_msgs::msg::Float32Stamped>("~/debug/points_size", 1);
   }
 
   // Set subscriber
@@ -147,11 +174,19 @@ void NoDetectionAreaFilterComponent::pointcloudCallback(const PointCloud2ConstPt
         << " to " << cloud_msg->header.frame_id);
     return;
   }
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = pcl::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
   pcl::fromROSMsg(*input_transformed_cloud_ptr, *cloud);
 
+  // calculate bounding box of points
+  const auto bounding_box = calcBoundingBox(cloud);
+
+  // get intersected lanelets
+  const auto intersected_lanelets =
+    calcIntersectedPolygons(bounding_box, no_detection_area_lanelets_);
+
   // filter pointcloud by lanelet
-  const auto filtered_cloud = filterPointCloud(no_detection_area_lanelets_, cloud);
+  const auto filtered_cloud = filterPointCloud(intersected_lanelets, cloud);
 
   // transform pointcloud to input frame
   PointCloud2Ptr output_cloud_ptr(new sensor_msgs::msg::PointCloud2);
@@ -176,6 +211,11 @@ void NoDetectionAreaFilterComponent::pointcloudCallback(const PointCloud2ConstPt
   debug_msg.stamp = this->now();
   debug_msg.data = elapsed_time.count() / 1000.0;
   debug_pub_->publish(debug_msg);
+
+  tier4_debug_msgs::msg::Float32Stamped debug_msg2;
+  debug_msg2.stamp = cloud_msg->header.stamp;
+  debug_msg2.data = cloud->size();
+  debug_pub2_->publish(debug_msg2);
 }
 
 void NoDetectionAreaFilterComponent::mapCallback(
