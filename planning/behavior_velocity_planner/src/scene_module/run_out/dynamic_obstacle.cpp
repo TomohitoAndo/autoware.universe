@@ -180,7 +180,7 @@ pcl::PointCloud<pcl::PointXYZ> selectLateralNearestPoints(
 // path is interpolated with given interval
 pcl::PointCloud<pcl::PointXYZ> extractLateralNearestPoints(
   const pcl::PointCloud<pcl::PointXYZ> & input_points, const PathWithLaneId & path,
-  const double interval)
+  const float interval)
 {
   // interpolate path points with given interval
   PathWithLaneId interpolated_path;
@@ -358,9 +358,8 @@ void DynamicObstacleCreatorForPoints::onCompareMapFilteredPointCloud(
     extractObstaclePointsWithinPolygon(voxel_grid_filtered_points, d.detection_area_polygon);
 
   // filter points that have lateral nearest distance
-  const double interval = 0.1;
   const auto laetral_nearest_points =
-    extractLateralNearestPoints(detection_area_filtered_points, d.path, interval);
+    extractLateralNearestPoints(detection_area_filtered_points, d.path, param_.interval);
 
   std::lock_guard<std::mutex> lock(mutex_);
   dynamic_obstacle_data_.obstacle_points = laetral_nearest_points;

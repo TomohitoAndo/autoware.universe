@@ -53,6 +53,7 @@ struct DynamicObstacleParam
   float height{2.0};                // [m]
   float max_prediction_time{10.0};  // [sec]
   float time_step{0.5};             // [sec]
+  float interval{0.1};              // [m]
 };
 
 struct PoseWithRange
