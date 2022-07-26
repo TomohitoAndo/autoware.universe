@@ -16,6 +16,7 @@
 #define SCENE_MODULE__RUN_OUT__DYNAMIC_OBSTACLE_HPP_
 
 #include "behavior_velocity_planner/planner_data.hpp"
+#include "utilization/path_utilization.hpp"
 #include "utilization/util.hpp"
 
 #include <tier4_autoware_utils/tier4_autoware_utils.hpp>
@@ -84,7 +85,7 @@ struct DynamicObstacle
 struct DynamicObstacleData
 {
   PredictedObjects predicted_objects;
-  pcl::PointCloud<pcl::PointXYZ> compare_map_filtered_pointcloud;
+  pcl::PointCloud<pcl::PointXYZ> obstacle_points;
   PathWithLaneId path;
   Polygons2d detection_area_polygon;
 };
@@ -154,7 +155,7 @@ private:
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;
 
-  // mutex for compare_map_filtered_pointcloud
+  // mutex for obstacle_points
   std::mutex mutex_;
 };
 
