@@ -147,6 +147,6 @@
               radius_ratio: 0.8
 
             rear_drive:
-              num_for_calculation: 3
+              num_for_calculation: 4
               front_radius_ratio: 1.0
               rear_radius_ratio: 1.0
