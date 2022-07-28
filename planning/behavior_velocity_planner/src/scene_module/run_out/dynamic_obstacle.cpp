@@ -201,6 +201,19 @@ pcl::PointCloud<pcl::PointXYZ> extractLateralNearestPoints(
 
   return lateral_nearest_points;
 }
+
+pcl::PointCloud<pcl::PointXYZ> filterPointsWithHeight(
+  const pcl::PointCloud<pcl::PointXYZ> & input_points, const float max_height)
+{
+  pcl::PointCloud<pcl::PointXYZ> output_points;
+  for (const auto & p : input_points) {
+    if (p.z < max_height) {
+      output_points.push_back(p);
+    }
+  }
+
+  return output_points;
+}
 }  // namespace
 
 DynamicObstacleCreatorForObject::DynamicObstacleCreatorForObject(rclcpp::Node & node)
@@ -345,9 +358,12 @@ void DynamicObstacleCreatorForPoints::onCompareMapFilteredPointCloud(
   pcl::PointCloud<pcl::PointXYZ> pc;
   pcl::fromROSMsg(*msg, pc);
 
+  // filter points with max height from base_link
+  const auto height_filtered_points = filterPointsWithHeight(pc, param_.height);
+
   Eigen::Affine3f affine = tf2::transformToEigen(transform.transform).cast<float>();
   pcl::PointCloud<pcl::PointXYZ>::Ptr pc_transformed(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::transformPointCloud(pc, *pc_transformed, affine);
+  pcl::transformPointCloud(height_filtered_points, *pc_transformed, affine);
 
   // apply voxel grid filter to reduce calculation cost
   const auto voxel_grid_filtered_points = applyVoxelGridFilter(pc_transformed);
