@@ -368,14 +368,18 @@ void DynamicObstacleCreatorForPoints::onCompareMapFilteredPointCloud(
   // apply voxel grid filter to reduce calculation cost
   const auto voxel_grid_filtered_points = applyVoxelGridFilter(pc_transformed);
 
+  mutex_.lock();
+  const auto detection_area_polygon = dynamic_obstacle_data_.detection_area_polygon;
+  const auto path = dynamic_obstacle_data_.path;
+  mutex_.unlock();
+
   // filter obstacle points within detection area polygon
-  const auto & d = dynamic_obstacle_data_;
   const auto detection_area_filtered_points =
-    extractObstaclePointsWithinPolygon(voxel_grid_filtered_points, d.detection_area_polygon);
+    extractObstaclePointsWithinPolygon(voxel_grid_filtered_points, detection_area_polygon);
 
   // filter points that have lateral nearest distance
   const auto laetral_nearest_points =
-    extractLateralNearestPoints(detection_area_filtered_points, d.path, param_.interval);
+    extractLateralNearestPoints(detection_area_filtered_points, path, param_.interval);
 
   std::lock_guard<std::mutex> lock(mutex_);
   dynamic_obstacle_data_.obstacle_points = laetral_nearest_points;
