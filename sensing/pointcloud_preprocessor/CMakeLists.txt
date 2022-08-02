@@ -65,7 +65,7 @@ rclcpp_components_register_node(pointcloud_preprocessor_filter
   PLUGIN "pointcloud_preprocessor::CropBoxFilterComponent"
   EXECUTABLE crop_box_filter_node)
 
-  
+
 # ========== Down Sampler Filter ==========
 # -- Voxel Grid Downsample Filter --
 rclcpp_components_register_node(pointcloud_preprocessor_filter
