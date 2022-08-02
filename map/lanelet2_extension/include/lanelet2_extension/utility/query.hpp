@@ -134,6 +134,9 @@ lanelet::ConstLineStrings3d getAllPedestrianMarkings(
 lanelet::ConstLineStrings3d getAllParkingSpaces(
   const lanelet::LaneletMapConstPtr & lanelet_map_ptr);
 
+// query all no detection area in lanelet2 map
+lanelet::ConstPolygons3d getAllNoDetectionArea(const lanelet::LaneletMapConstPtr & lanelet_map_ptr);
+
 // query linked parking spaces from lanelet
 lanelet::ConstLineStrings3d getLinkedParkingSpaces(
   const lanelet::ConstLanelet & lanelet, const lanelet::LaneletMapConstPtr & lanelet_map_ptr);
