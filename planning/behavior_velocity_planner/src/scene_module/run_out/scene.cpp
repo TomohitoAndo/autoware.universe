@@ -47,6 +47,29 @@ bool RunOutModule::modifyPathVelocity(
   autoware_auto_planning_msgs::msg::PathWithLaneId * path,
   [[maybe_unused]] tier4_planning_msgs::msg::StopReason * stop_reason)
 {
+
+  // debug
+  size_t index = 0;
+  for (const auto & path_point : path->points) {
+    const auto & p = path_point.point.pose;
+
+    // visualize vehicle polygon
+    const auto vehicle_poly = createVehiclePolygon(p);
+    debug_ptr_->pushDebugPolygons(vehicle_poly);
+
+    // visualize path pose
+    debug_ptr_->pushDebugPoses(p);
+
+    // visualize path index
+    std::stringstream sstream;
+    sstream << index;
+    debug_ptr_->pushDebugTexts(sstream.str(), p, /* lateral_offset */ -2.0);
+    index++;
+  }
+
+  // immediately return for debug
+  return true;
+
   // timer starts
   const auto t1_modify_path = std::chrono::system_clock::now();
 
@@ -200,7 +223,7 @@ boost::optional<DynamicObstacle> RunOutModule::detectCollision(
 
     // debug
     {
-      debug_ptr_->pushDebugPolygons(vehicle_poly);
+      // debug_ptr_->pushDebugPolygons(vehicle_poly);
       std::stringstream sstream;
       sstream << std::setprecision(4) << travel_time << "s";
       debug_ptr_->pushDebugTexts(sstream.str(), p2.pose, /* lateral_offset */ 3.0);
