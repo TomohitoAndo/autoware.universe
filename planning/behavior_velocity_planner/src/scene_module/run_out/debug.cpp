@@ -146,6 +146,11 @@ void RunOutDebug::pushDebugTexts(const std::string text, const geometry_msgs::ms
   debug_texts_.push_back(createDebugText(text, position));
 }
 
+void RunOutDebug::pushDebugPoses(const geometry_msgs::msg::Pose & pose)
+{
+  debug_poses_.push_back(pose);
+}
+
 void RunOutDebug::clearDebugMarker()
 {
   debug_points_.clear();
@@ -155,6 +160,7 @@ void RunOutDebug::clearDebugMarker()
   debug_polygons_.clear();
   detection_area_polygons_.clear();
   debug_texts_.clear();
+  debug_poses_.clear();
 }
 
 visualization_msgs::msg::MarkerArray RunOutDebug::createVisualizationMarkerArray()
@@ -280,6 +286,18 @@ visualization_msgs::msg::MarkerArray RunOutDebug::createVisualizationMarkerArray
       marker.pose.position.z += height_offset;
       marker.text = text.text;
 
+      msg.markers.push_back(marker);
+      marker.id++;
+    }
+  }
+
+  if (!debug_poses_.empty()) {
+    auto marker = createDefaultMarker(
+      "map", current_time, "debug_poses", 0, visualization_msgs::msg::Marker::ARROW,
+      createMarkerScale(1.0, 0.3, 0.3), createMarkerColor(1.0, 0, 0, 0.999));
+
+    for (const auto & debug_pose : debug_poses_) {
+      marker.pose = debug_pose;
       msg.markers.push_back(marker);
       marker.id++;
     }
