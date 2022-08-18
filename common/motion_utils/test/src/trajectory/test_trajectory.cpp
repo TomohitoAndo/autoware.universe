@@ -1354,50 +1354,52 @@ TEST(trajectory, calcLongitudinalOffsetPoseFromIndex_quatSphericalInterpolation)
     EXPECT_NEAR(p_out.get().orientation.w, ans_quat.w, epsilon);
   }
 
-  // // Found pose(backward)
-  // for (double len = total_length; 0.0 < len; len -= 0.1) {
-  //   const auto p_out = calcLongitudinalOffsetPose(traj.points, 1, -len);
-  //   const auto ans_quat = createQuaternionFromRPY(deg2rad(0.0), deg2rad(0.0), deg2rad(45.0));
+  // Found pose(backward)
+  for (double len = total_length; 0.0 < len; len -= 0.1) {
+    const auto p_out = calcLongitudinalOffsetPose(traj.points, 1, -len, true);
+    const auto ratio = len / total_length;
+    const auto ans_quat =
+      createQuaternionFromRPY(deg2rad(0.0), deg2rad(0.0), deg2rad(45.0 * ratio));
 
-  //   EXPECT_NE(p_out, boost::none);
-  //   EXPECT_NEAR(p_out.get().position.x, 1.0 - len * std::cos(deg2rad(45.0)), epsilon);
-  //   EXPECT_NEAR(p_out.get().position.y, 1.0 - len * std::sin(deg2rad(45.0)), epsilon);
-  //   EXPECT_NEAR(p_out.get().position.z, 0.0, epsilon);
-  //   EXPECT_NEAR(p_out.get().orientation.x, ans_quat.x, epsilon);
-  //   EXPECT_NEAR(p_out.get().orientation.y, ans_quat.y, epsilon);
-  //   EXPECT_NEAR(p_out.get().orientation.z, ans_quat.z, epsilon);
-  //   EXPECT_NEAR(p_out.get().orientation.w, ans_quat.w, epsilon);
-  // }
+    EXPECT_NE(p_out, boost::none);
+    EXPECT_NEAR(p_out.get().position.x, 1.0 - len * std::cos(deg2rad(45.0)), epsilon);
+    EXPECT_NEAR(p_out.get().position.y, 1.0 - len * std::sin(deg2rad(45.0)), epsilon);
+    EXPECT_NEAR(p_out.get().position.z, 0.0, epsilon);
+    EXPECT_NEAR(p_out.get().orientation.x, ans_quat.x, epsilon);
+    EXPECT_NEAR(p_out.get().orientation.y, ans_quat.y, epsilon);
+    EXPECT_NEAR(p_out.get().orientation.z, ans_quat.z, epsilon);
+    EXPECT_NEAR(p_out.get().orientation.w, ans_quat.w, epsilon);
+  }
 
-  // // Boundary condition
-  // {
-  //   const auto p_out = calcLongitudinalOffsetPose(traj.points, 0, total_length);
-  //   const auto ans_quat = createQuaternionFromRPY(deg2rad(0.0), deg2rad(0.0), deg2rad(0.0));
+  // Boundary condition
+  {
+    const auto p_out = calcLongitudinalOffsetPose(traj.points, 0, total_length, true);
+    const auto ans_quat = createQuaternionFromRPY(deg2rad(0.0), deg2rad(0.0), deg2rad(0.0));
 
-  //   EXPECT_NE(p_out, boost::none);
-  //   EXPECT_NEAR(p_out.get().position.x, 1.0, epsilon);
-  //   EXPECT_NEAR(p_out.get().position.y, 1.0, epsilon);
-  //   EXPECT_NEAR(p_out.get().position.z, 0.0, epsilon);
-  //   EXPECT_NEAR(p_out.get().orientation.x, ans_quat.x, epsilon);
-  //   EXPECT_NEAR(p_out.get().orientation.y, ans_quat.y, epsilon);
-  //   EXPECT_NEAR(p_out.get().orientation.z, ans_quat.z, epsilon);
-  //   EXPECT_NEAR(p_out.get().orientation.w, ans_quat.w, epsilon);
-  // }
+    EXPECT_NE(p_out, boost::none);
+    EXPECT_NEAR(p_out.get().position.x, 1.0, epsilon);
+    EXPECT_NEAR(p_out.get().position.y, 1.0, epsilon);
+    EXPECT_NEAR(p_out.get().position.z, 0.0, epsilon);
+    EXPECT_NEAR(p_out.get().orientation.x, ans_quat.x, epsilon);
+    EXPECT_NEAR(p_out.get().orientation.y, ans_quat.y, epsilon);
+    EXPECT_NEAR(p_out.get().orientation.z, ans_quat.z, epsilon);
+    EXPECT_NEAR(p_out.get().orientation.w, ans_quat.w, epsilon);
+  }
 
-  // // Boundary condition
-  // {
-  //   const auto p_out = calcLongitudinalOffsetPose(traj.points, 1, 0.0);
-  //   const auto ans_quat = createQuaternionFromRPY(deg2rad(0.0), deg2rad(0.0), deg2rad(0.0));
+  // Boundary condition
+  {
+    const auto p_out = calcLongitudinalOffsetPose(traj.points, 1, 0.0, true);
+    const auto ans_quat = createQuaternionFromRPY(deg2rad(0.0), deg2rad(0.0), deg2rad(0.0));
 
-  //   EXPECT_NE(p_out, boost::none);
-  //   EXPECT_NEAR(p_out.get().position.x, 1.0, epsilon);
-  //   EXPECT_NEAR(p_out.get().position.y, 1.0, epsilon);
-  //   EXPECT_NEAR(p_out.get().position.z, 0.0, epsilon);
-  //   EXPECT_NEAR(p_out.get().orientation.x, ans_quat.x, epsilon);
-  //   EXPECT_NEAR(p_out.get().orientation.y, ans_quat.y, epsilon);
-  //   EXPECT_NEAR(p_out.get().orientation.z, ans_quat.z, epsilon);
-  //   EXPECT_NEAR(p_out.get().orientation.w, ans_quat.w, epsilon);
-  // }
+    EXPECT_NE(p_out, boost::none);
+    EXPECT_NEAR(p_out.get().position.x, 1.0, epsilon);
+    EXPECT_NEAR(p_out.get().position.y, 1.0, epsilon);
+    EXPECT_NEAR(p_out.get().position.z, 0.0, epsilon);
+    EXPECT_NEAR(p_out.get().orientation.x, ans_quat.x, epsilon);
+    EXPECT_NEAR(p_out.get().orientation.y, ans_quat.y, epsilon);
+    EXPECT_NEAR(p_out.get().orientation.z, ans_quat.z, epsilon);
+    EXPECT_NEAR(p_out.get().orientation.w, ans_quat.w, epsilon);
+  }
 }
 
 TEST(trajectory, calcLongitudinalOffsetPoseFromPoint)
