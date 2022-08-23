@@ -29,6 +29,12 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl_conversions/pcl_conversions.h>
 
+// debug
+#include <tier4_autoware_utils/geometry/geometry.hpp>
+#include <tier4_autoware_utils/ros/marker_helper.hpp>
+
+#include <visualization_msgs/msg/marker_array.hpp>
+
 #ifdef ROS_DISTRO_GALACTIC
 #include <tf2_eigen/tf2_eigen.h>
 #else
@@ -59,6 +65,10 @@ private:
   lanelet::ConstPolygons3d no_detection_area_lanelets_;
 
   void mapCallback(const autoware_auto_mapping_msgs::msg::HADMapBin::ConstSharedPtr msg);
+
+  // debug
+  void visualizeBoundingBox([[maybe_unused]] const tier4_autoware_utils::Box2d & bounding_box);
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr debug_viz_pub_;
 
 public:
   PCL_MAKE_ALIGNED_OPERATOR_NEW

@@ -94,6 +94,47 @@ NoDetectionAreaFilterComponent::NoDetectionAreaFilterComponent(
   map_sub_ = this->create_subscription<autoware_auto_mapping_msgs::msg::HADMapBin>(
     "input/vector_map", rclcpp::QoS{1}.transient_local(),
     std::bind(&NoDetectionAreaFilterComponent::mapCallback, this, _1));
+
+  // debug
+  debug_viz_pub_ =
+    this->create_publisher<visualization_msgs::msg::MarkerArray>("~/debug/marker", 1);
+}
+
+// debug
+void NoDetectionAreaFilterComponent::visualizeBoundingBox(
+  [[maybe_unused]] const tier4_autoware_utils::Box2d & bounding_box)
+{
+  using tier4_autoware_utils::createDefaultMarker;
+  using tier4_autoware_utils::createMarkerColor;
+  using tier4_autoware_utils::createMarkerScale;
+
+  // visualize
+  rclcpp::Time current_time = this->now();
+  auto marker = createDefaultMarker(
+    "map", current_time, "debug_box", 0, visualization_msgs::msg::Marker::LINE_STRIP,
+    createMarkerScale(0.1, 0.1, 0.1), createMarkerColor(0.0, 0.0, 1.0, 0.9));
+
+  const auto bb_min = bounding_box.min_corner();
+  const auto bb_max = bounding_box.max_corner();
+
+  std::vector<geometry_msgs::msg::Point> bb_poly;
+  bb_poly.push_back(tier4_autoware_utils::createPoint(bb_min.x(), bb_min.y(), 0));
+  bb_poly.push_back(tier4_autoware_utils::createPoint(bb_min.x(), bb_max.y(), 0));
+  bb_poly.push_back(tier4_autoware_utils::createPoint(bb_max.x(), bb_max.y(), 0));
+  bb_poly.push_back(tier4_autoware_utils::createPoint(bb_max.x(), bb_min.y(), 0));
+  // close polygon
+  bb_poly.push_back(tier4_autoware_utils::createPoint(bb_min.x(), bb_min.y(), 0));
+
+  marker.points.push_back(bb_poly.at(0));
+  marker.points.push_back(bb_poly.at(1));
+  marker.points.push_back(bb_poly.at(2));
+  marker.points.push_back(bb_poly.at(3));
+  marker.points.push_back(bb_poly.at(4));
+
+  visualization_msgs::msg::MarkerArray msg;
+  msg.markers.push_back(marker);
+
+  debug_viz_pub_->publish(msg);
 }
 
 void NoDetectionAreaFilterComponent::filter(
@@ -111,6 +152,9 @@ void NoDetectionAreaFilterComponent::filter(
 
   // calculate bounding box of points
   const auto bounding_box = calcBoundingBox(pc_input);
+
+  // debug
+  visualizeBoundingBox(bounding_box);
 
   // use only intersected lanelets to reduce calculation cost
   const auto intersected_lanelets =
@@ -131,7 +175,9 @@ void NoDetectionAreaFilterComponent::mapCallback(
 
   const auto lanelet_map_ptr = std::make_shared<lanelet::LaneletMap>();
   lanelet::utils::conversion::fromBinMsg(*map_msg, lanelet_map_ptr);
-  no_detection_area_lanelets_ = lanelet::utils::query::getAllNoDetectionArea(lanelet_map_ptr);
+  const std::string polygon_type = "no_obstacle_segmentation_area";
+  no_detection_area_lanelets_ =
+    lanelet::utils::query::getAllPolygonsByType(lanelet_map_ptr, polygon_type);
 }
 
 }  // namespace pointcloud_preprocessor
