@@ -27,6 +27,10 @@
 #include <CGAL/Polygon_2_algorithms.h>
 #include <lanelet2_core/geometry/Polygon.h>
 
+// debug
+#include "pointcloud_preprocessor/no_detection_area_filter/debug.hpp"
+
+#include <memory>
 #include <string>
 using K = CGAL::Exact_predicates_inexact_constructions_kernel;
 using PointCgal = K::Point_2;
@@ -51,6 +55,9 @@ private:
 
   // parameter
   std::string polygon_type_;
+
+  // debug
+  std::unique_ptr<DebugValuePublisher> debug_value_publisher_;
 
 public:
   PCL_MAKE_ALIGNED_OPERATOR_NEW

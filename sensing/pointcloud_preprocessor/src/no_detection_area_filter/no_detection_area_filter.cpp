@@ -185,6 +185,8 @@ NoDetectionAreaFilterComponent::NoDetectionAreaFilterComponent(
   polygon_type_ =
     static_cast<std::string>(declare_parameter("polygon_type", "no_obstacle_segmentation_area"));
 
+  debug_value_publisher_ = std::make_unique<DebugValuePublisher>(*this);
+
   using std::placeholders::_1;
   // Set subscriber
   map_sub_ = this->create_subscription<autoware_auto_mapping_msgs::msg::HADMapBin>(
@@ -242,6 +244,13 @@ void NoDetectionAreaFilterComponent::filter(
   RCLCPP_WARN_STREAM(
     rclcpp::get_logger("debug"),
     "bg, cgal = " << elapsed_bg.count() / 1000.0 << ", " << elapsed_cgal.count() / 1000.0);
+
+  debug_value_publisher_->setDebugValues(
+    DebugValues::TYPE::CALCULATION_TIME_BG, elapsed_bg.count() / 1000.0);
+  debug_value_publisher_->setDebugValues(
+    DebugValues::TYPE::CALCULATION_TIME_CGAL, elapsed_cgal.count() / 1000.0);
+  debug_value_publisher_->setDebugValues(DebugValues::TYPE::SIZE_POINTS, pc_input->size());
+  debug_value_publisher_->publishDebugValue();
 
   // convert to ROS message
   pcl::toROSMsg(cgal_filtered_pc, output);
