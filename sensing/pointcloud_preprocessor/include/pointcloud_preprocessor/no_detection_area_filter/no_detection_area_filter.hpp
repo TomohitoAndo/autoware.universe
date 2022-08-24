@@ -21,9 +21,15 @@
 #include <lanelet2_extension/utility/query.hpp>
 #include <tier4_autoware_utils/geometry/boost_geometry.hpp>
 
+#include <sensor_msgs/point_cloud2_iterator.hpp>
+
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Polygon_2_algorithms.h>
 #include <lanelet2_core/geometry/Polygon.h>
 
 #include <string>
+using K = CGAL::Exact_predicates_inexact_constructions_kernel;
+using PointCgal = K::Point_2;
 
 using tier4_autoware_utils::LinearRing2d;
 using tier4_autoware_utils::MultiPoint2d;
