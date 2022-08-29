@@ -60,6 +60,8 @@ private:
   // Variable
   State state_{State::GO};
   rclcpp::Time stop_time_;
+  boost::optional<DynamicObstacle> prev_obstacle_;
+  rclcpp::Time prev_obstacle_time_;
   BasicPolygons2d partition_lanelets_;
   std::unique_ptr<DynamicObstacleCreator> dynamic_obstacle_creator_;
   std::shared_ptr<RunOutDebug> debug_ptr_;
