@@ -79,6 +79,7 @@ struct ApproachingParam
   float stop_thresh;
   float stop_time_thresh;
   float dist_thresh;
+  float keep_obstacle_thresh;
 };
 
 struct SlowDownLimit

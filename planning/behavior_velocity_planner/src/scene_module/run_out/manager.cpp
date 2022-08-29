@@ -90,6 +90,7 @@ RunOutModuleManager::RunOutModuleManager(rclcpp::Node & node)
     p.stop_thresh = node.declare_parameter(ns_a + ".stop_thresh", 0.01);
     p.stop_time_thresh = node.declare_parameter(ns_a + ".stop_time_thresh", 3.0);
     p.dist_thresh = node.declare_parameter(ns_a + ".dist_thresh", 0.5);
+    p.keep_obstacle_thresh = node.declare_parameter(ns_a + ".keep_obstacle_thresh", 1.0);
   }
 
   {

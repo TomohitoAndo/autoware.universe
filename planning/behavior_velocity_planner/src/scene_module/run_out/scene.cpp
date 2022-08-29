@@ -680,9 +680,8 @@ void RunOutModule::insertVelocity(
     }
 
     // avoid chattering of obstacle detection
-    constexpr int keep_obstacle_threshold = 1.0;
-    const bool keep_obstacle =
-      (clock_->now() - prev_obstacle_time_).seconds() < keep_obstacle_threshold;
+    const bool keep_obstacle = (clock_->now() - prev_obstacle_time_).seconds() <
+                               planner_param_.approaching.keep_obstacle_thresh;
     if (keep_obstacle) {
       RCLCPP_DEBUG_STREAM(logger_, "keep obstacle.");
       target_obstacle = *prev_obstacle_;
