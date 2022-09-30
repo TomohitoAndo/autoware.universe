@@ -35,6 +35,11 @@
   <arg name="output_twist_name" default="ekf_twist"/>
   <arg name="output_twist_with_covariance_name" default="ekf_twist_with_covariance"/>
 
+  <!-- for lsim -->
+  <arg name="output_tf_offset_x" default="0.0"/>
+  <arg name="output_tf_offset_y" default="5.0"/>
+  <arg name="output_tf_offset_z" default="0.0"/>
+
   <node pkg="ekf_localizer" exec="ekf_localizer" name="ekf_localizer" output="screen">
     <remap from="in_pose_with_covariance" to="$(var input_pose_with_cov_name)"/>
 
@@ -64,6 +69,10 @@
     <param name="proc_stddev_yaw_bias_c" value="$(var proc_stddev_yaw_bias_c)"/>
     <param name="proc_stddev_vx_c" value="$(var proc_stddev_vx_c)"/>
     <param name="proc_stddev_wz_c" value="$(var proc_stddev_wz_c)"/>
+
+    <param name="output_tf_offset_x" value="$(var output_tf_offset_x)"/>
+    <param name="output_tf_offset_y" value="$(var output_tf_offset_y)"/>
+    <param name="output_tf_offset_z" value="$(var output_tf_offset_z)"/>
 
     <remap from="ekf_odom" to="$(var output_odom_name)"/>
     <remap from="ekf_pose" to="$(var output_pose_name)"/>

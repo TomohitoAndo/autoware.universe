@@ -64,6 +64,11 @@ EKFLocalizer::EKFLocalizer(const std::string & node_name, const rclcpp::NodeOpti
     proc_stddev_yaw_bias_c_ = 0.0;
   }
 
+  /* lsim */
+  output_tf_offset_x_ = declare_parameter("output_tf_offset_x", 10.0);
+  output_tf_offset_y_ = declare_parameter("output_tf_offset_y", 10.0);
+  output_tf_offset_z_ = declare_parameter("output_tf_offset_z", 10.0);
+
   /* convert to continuous to discrete */
   proc_cov_vx_d_ = std::pow(proc_stddev_vx_c_ * ekf_dt_, 2.0);
   proc_cov_wz_d_ = std::pow(proc_stddev_wz_c_ * ekf_dt_, 2.0);
@@ -248,14 +253,18 @@ void EKFLocalizer::timerTFCallback()
   transformStamped.header.stamp = this->now();
   transformStamped.header.frame_id = current_ekf_pose_.header.frame_id;
   transformStamped.child_frame_id = "base_link";
-  transformStamped.transform.translation.x = current_ekf_pose_.pose.position.x;
-  transformStamped.transform.translation.y = current_ekf_pose_.pose.position.y;
-  transformStamped.transform.translation.z = current_ekf_pose_.pose.position.z;
 
-  transformStamped.transform.rotation.x = current_ekf_pose_.pose.orientation.x;
-  transformStamped.transform.rotation.y = current_ekf_pose_.pose.orientation.y;
-  transformStamped.transform.rotation.z = current_ekf_pose_.pose.orientation.z;
-  transformStamped.transform.rotation.w = current_ekf_pose_.pose.orientation.w;
+  // offset tf
+  const auto offset_pose = tier4_autoware_utils::calcOffsetPose(
+    current_ekf_pose_.pose, output_tf_offset_x_, output_tf_offset_y_, output_tf_offset_z_);
+
+  transformStamped.transform.translation.x = offset_pose.position.x;
+  transformStamped.transform.translation.y = offset_pose.position.y;
+  transformStamped.transform.translation.z = offset_pose.position.z;
+  transformStamped.transform.rotation.x = offset_pose.orientation.x;
+  transformStamped.transform.rotation.y = offset_pose.orientation.y;
+  transformStamped.transform.rotation.z = offset_pose.orientation.z;
+  transformStamped.transform.rotation.w = offset_pose.orientation.w;
 
   tf_br_->sendTransform(transformStamped);
 }

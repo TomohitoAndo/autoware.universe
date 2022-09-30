@@ -218,6 +218,11 @@ private:
   int pose_smoothing_steps_;
   int twist_smoothing_steps_;
 
+  /* for lsim */
+  double output_tf_offset_x_;
+  double output_tf_offset_y_;
+  double output_tf_offset_z_;
+
   /**
    * @brief computes update & prediction of EKF for each ekf_dt_[s] time
    */
