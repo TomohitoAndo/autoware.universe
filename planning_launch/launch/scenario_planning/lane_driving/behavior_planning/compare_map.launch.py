@@ -51,7 +51,7 @@ def generate_launch_description():
             ],
             parameters=[
                 {
-                    "distance_threshold": 0.7,
+                    "distance_threshold": 0.3,
                 }
             ],
             extra_arguments=[
