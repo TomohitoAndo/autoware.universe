@@ -36,8 +36,8 @@
   <arg name="output_twist_with_covariance_name" default="ekf_twist_with_covariance"/>
 
   <!-- for lsim -->
-  <arg name="output_tf_offset_x" default="0.19339"/>
-  <arg name="output_tf_offset_y" default="0.0"/>
+  <arg name="output_tf_offset_x" default="0.0"/>
+  <arg name="output_tf_offset_y" default="0.19339"/>
   <arg name="output_tf_offset_z" default="0.0"/>
 
   <node pkg="ekf_localizer" exec="ekf_localizer" name="ekf_localizer" output="screen">
