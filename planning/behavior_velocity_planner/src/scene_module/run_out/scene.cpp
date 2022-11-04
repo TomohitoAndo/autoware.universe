@@ -22,6 +22,28 @@ namespace behavior_velocity_planner
 {
 namespace bg = boost::geometry;
 
+namespace
+{
+void visualizePathForDebug(const PathWithLaneId & path, std::shared_ptr<RunOutDebug> & debug_ptr)
+{
+  size_t index = 0;
+  for (const auto & path_point : path.points) {
+    const auto & p = path_point.point.pose;
+
+    // visualize vehicle polygon
+    // const auto vehicle_poly = createVehiclePolygon(p);
+    // debug_ptr_->pushDebugPolygons(vehicle_poly);
+
+    // visualize path pose
+    debug_ptr->pushDebugPoses(p);
+
+    // visualize path index
+    debug_ptr->pushPathIndexTexts(index, p, /* lateral_offset */ -2.0);
+    index++;
+  }
+}
+}  // namespace
+
 RunOutModule::RunOutModule(
   const int64_t module_id, const std::shared_ptr<const PlannerData> & planner_data,
   const PlannerParam & planner_param, const rclcpp::Logger logger,
@@ -47,6 +69,8 @@ bool RunOutModule::modifyPathVelocity(
   autoware_auto_planning_msgs::msg::PathWithLaneId * path,
   [[maybe_unused]] tier4_planning_msgs::msg::StopReason * stop_reason)
 {
+  visualizePathForDebug(*path, debug_ptr_);
+
   // timer starts
   const auto t1_modify_path = std::chrono::system_clock::now();
 

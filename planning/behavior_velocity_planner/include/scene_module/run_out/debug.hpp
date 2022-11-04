@@ -113,6 +113,9 @@ public:
   void pushDebugTexts(
     const std::string text, const geometry_msgs::msg::Pose pose, const float lateral_offset);
   void pushDebugTexts(const std::string text, const geometry_msgs::msg::Point position);
+  void pushPathIndexTexts(
+    const int idx, const geometry_msgs::msg::Pose pose, const float lateral_offset);
+  void pushDebugPoses(const geometry_msgs::msg::Pose & pose);
   void setAccelReason(const AccelReason & accel_reason);
   void publishDebugValue();
   void publishDebugTrajectory(const Trajectory & trajectory);
@@ -136,6 +139,8 @@ private:
   std::vector<std::vector<geometry_msgs::msg::Point>> debug_polygons_;
   std::vector<std::vector<geometry_msgs::msg::Point>> detection_area_polygons_;
   std::vector<TextWithPosition> debug_texts_;
+  std::vector<TextWithPosition> path_index_texts_;
+  std::vector<geometry_msgs::msg::Pose> debug_poses_;
   DebugValues debug_values_;
   AccelReason accel_reason_;
 };
