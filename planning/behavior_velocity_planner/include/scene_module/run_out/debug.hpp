@@ -103,6 +103,9 @@ public:
   void pushDetectionAreaPolygons(const Polygon2d & debug_polygon);
   void pushTravelTimeTexts(
     const double travel_time, const geometry_msgs::msg::Pose pose, const float lateral_offset);
+  void pushPathIndexTexts(
+    const int idx, const geometry_msgs::msg::Pose pose, const float lateral_offset);
+  void pushDebugPoses(const geometry_msgs::msg::Pose & pose);
   void setAccelReason(const AccelReason & accel_reason);
   void publishDebugValue();
   void publishDebugTrajectory(const Trajectory & trajectory);
@@ -127,6 +130,8 @@ private:
   std::vector<std::vector<geometry_msgs::msg::Point>> collision_obstacle_polygons_;
   std::vector<std::vector<geometry_msgs::msg::Point>> detection_area_polygons_;
   std::vector<TextWithPosition> travel_time_texts_;
+  std::vector<TextWithPosition> path_index_texts_;
+  std::vector<geometry_msgs::msg::Pose> debug_poses_;
   DebugValues debug_values_;
   AccelReason accel_reason_;
   double height_{0};
