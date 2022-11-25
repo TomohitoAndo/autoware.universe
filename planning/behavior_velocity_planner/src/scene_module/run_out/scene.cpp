@@ -69,8 +69,6 @@ bool RunOutModule::modifyPathVelocity(
   autoware_auto_planning_msgs::msg::PathWithLaneId * path,
   [[maybe_unused]] tier4_planning_msgs::msg::StopReason * stop_reason)
 {
-  visualizePathForDebug(*path, debug_ptr_);
-
   // timer starts
   const auto t1_modify_path = std::chrono::system_clock::now();
 
@@ -117,16 +115,24 @@ bool RunOutModule::modifyPathVelocity(
   debug_ptr_->setDebugValues(
     DebugValues::TYPE::CALCULATION_TIME_COLLISION_CHECK, elapsed_collision_check.count() / 1000.0);
 
+  // work around for wired path
+  // interpolate path with spline interpolation
+  const double interval = 1.0;
+  PathWithLaneId interpolated_path;
+  if (!splineInterpolate(*path, interval, interpolated_path, logger_)) {
+    return {};
+  }
+
   // insert stop point for the detected obstacle
   if (planner_param_.approaching.enable) {
     // after a certain amount of time has elapsed since the ego stopped,
     // approach the obstacle with slow velocity
     insertVelocity(
-      dynamic_obstacle, current_pose, current_vel, current_acc, trim_smoothed_path, *path);
+      dynamic_obstacle, current_pose, current_vel, current_acc, interpolated_path, *path);
   } else {
     // just insert zero velocity for stopping
     insertStoppingVelocity(
-      dynamic_obstacle, current_pose, current_vel, current_acc, trim_smoothed_path, *path);
+      dynamic_obstacle, current_pose, current_vel, current_acc, interpolated_path, *path);
   }
 
   // apply max jerk limit if the ego can't stop with specified max jerk and acc
@@ -143,6 +149,8 @@ bool RunOutModule::modifyPathVelocity(
     std::chrono::duration_cast<std::chrono::microseconds>(t2_modify_path - t1_modify_path);
   debug_ptr_->setDebugValues(
     DebugValues::TYPE::CALCULATION_TIME, elapsed_modify_path.count() / 1000.0);
+
+  visualizePathForDebug(*path, debug_ptr_);
 
   return true;
 }
