@@ -76,6 +76,7 @@ struct DetectionArea
 struct ApproachingParam
 {
   bool enable;
+  bool keep_velocity;
   float margin;
   float limit_vel_kmph;
 };

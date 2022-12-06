@@ -702,7 +702,7 @@ void RunOutModule::insertVelocityForState(
     case State::APPROACH: {
       insertApproachingVelocity(
         *target_obstacle, current_pose, planner_param.approaching.limit_vel_kmph / 3.6,
-        planner_param.approaching.margin, output_path);
+        planner_param.approaching.margin, planner_param.approaching.keep_velocity, output_path);
       debug_ptr_->setAccelReason(RunOutDebug::AccelReason::STOP);
       break;
     }
@@ -726,13 +726,19 @@ void RunOutModule::insertStoppingVelocity(
 
 void RunOutModule::insertApproachingVelocity(
   const DynamicObstacle & dynamic_obstacle, const geometry_msgs::msg::Pose & current_pose,
-  const float approaching_vel, const float approach_margin, PathWithLaneId & output_path)
+  const float approaching_vel, const float approach_margin, const bool keep_velocity,
+  PathWithLaneId & output_path)
 {
   // insert slow down velocity from nearest segment point
   const auto nearest_seg_idx =
     motion_utils::findNearestSegmentIndex(output_path.points, current_pose.position);
   run_out_utils::insertPathVelocityFromIndexLimited(
     nearest_seg_idx, approaching_vel, output_path.points);
+
+  // keep approaching velocity until ego passes the obstacle
+  if (keep_velocity) {
+    return;
+  }
 
   // calculate stop point to insert 0 velocity
   const float base_to_collision_point =

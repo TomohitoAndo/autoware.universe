@@ -87,6 +87,7 @@ RunOutModuleManager::RunOutModuleManager(rclcpp::Node & node)
     auto & p = planner_param_.approaching;
     const std::string ns_a = ns + ".approaching";
     p.enable = node.declare_parameter(ns_a + ".enable", false);
+    p.keep_velocity = node.declare_parameter(ns_a + ".keep_velocity", true);
     p.margin = node.declare_parameter(ns_a + ".margin", 0.0);
     p.limit_vel_kmph = node.declare_parameter(ns_a + ".limit_vel_kmph", 5.0);
   }

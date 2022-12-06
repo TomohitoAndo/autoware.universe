@@ -127,7 +127,8 @@ private:
 
   void insertApproachingVelocity(
     const DynamicObstacle & dynamic_obstacle, const geometry_msgs::msg::Pose & current_pose,
-    const float approaching_vel, const float approach_margin, PathWithLaneId & output_path);
+    const float approaching_vel, const float approach_margin, const bool keep_velocity,
+    PathWithLaneId & output_path);
 
   void applyMaxJerkLimit(
     const geometry_msgs::msg::Pose & current_pose, const float current_vel, const float current_acc,
