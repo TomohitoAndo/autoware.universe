@@ -168,6 +168,7 @@ void ObstacleStopPlannerDebugNode::publish()
   slow_down_end_pose_ptr_ = nullptr;
   stop_obstacle_point_ptr_ = nullptr;
   slow_down_obstacle_point_ptr_ = nullptr;
+  target_stop_pose_ptr_ = nullptr;
 }
 
 MarkerArray ObstacleStopPlannerDebugNode::makeVirtualWallMarker()
