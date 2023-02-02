@@ -17,12 +17,12 @@
 
       # This area uses no map filtered points for safety
       mandatory_area:
-        enable: true
         decel_jerk: -1.2 # [m/s^3] deceleration jerk for obstacles in this area
         stop_margin: 1.0 # [m] stop distance for obstacles in this area
 
       # parameter to create abstracted dynamic obstacles
       dynamic_obstacle:
+        use_mandatory_area: false # [-] whether to use mandatory detection area
         min_vel_kmph: 0.0         # [km/h] minimum velocity for dynamic obstacles
         max_vel_kmph: 5.0         # [km/h] maximum velocity for dynamic obstacles
         diameter: 0.1             # [m] diameter of obstacles. used for creating dynamic obstacles from points
