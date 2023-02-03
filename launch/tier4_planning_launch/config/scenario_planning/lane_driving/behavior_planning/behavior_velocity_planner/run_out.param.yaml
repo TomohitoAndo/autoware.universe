@@ -18,7 +18,6 @@
       # This area uses no map filtered points for safety
       mandatory_area:
         decel_jerk: -1.2 # [m/s^3] deceleration jerk for obstacles in this area
-        stop_margin: 1.0 # [m] stop distance for obstacles in this area
 
       # parameter to create abstracted dynamic obstacles
       dynamic_obstacle:
