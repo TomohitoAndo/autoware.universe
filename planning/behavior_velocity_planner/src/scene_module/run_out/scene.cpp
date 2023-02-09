@@ -799,7 +799,6 @@ void RunOutModule::publishDebugValue(
   }
 
   debug_ptr_->publishDebugValue();
-  debug_ptr_->publishDebugPointCloud();
 }
 
 }  // namespace behavior_velocity_planner
