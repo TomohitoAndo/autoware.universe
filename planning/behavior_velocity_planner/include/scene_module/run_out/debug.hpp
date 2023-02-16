@@ -37,6 +37,7 @@ public:
     STOP_DISTANCE = 6,
     NUM_OBSTACLES = 7,
     LATERAL_PASS_DIST = 8,
+    DETECTION_AREA_LATERAL_DIST = 9,
     SIZE,  // this is the number of enum elements
   };
 

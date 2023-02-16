@@ -180,10 +180,10 @@ Polygons2d RunOutModule::createDetectionAreaPolygon(const PathWithLaneId & smoot
     RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "failed to calculate lateral dist");
     return detection_area_poly;
   }
-  RCLCPP_WARN_STREAM(
-    rclcpp::get_logger("debug"), "lateral dist: " << lateral_point_with_dist.lateral_dist);
   debug_ptr_->pushNearestCollisionPoint(lateral_point_with_dist.point_left);
   debug_ptr_->pushNearestCollisionPoint(lateral_point_with_dist.point_right);
+  debug_ptr_->setDebugValues(
+    DebugValues::TYPE::DETECTION_AREA_LATERAL_DIST, lateral_point_with_dist.lateral_dist);
 
   return detection_area_poly;
 }
