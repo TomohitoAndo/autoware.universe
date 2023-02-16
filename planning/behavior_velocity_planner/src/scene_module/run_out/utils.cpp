@@ -485,5 +485,119 @@ DetectionMethod toEnum(const std::string & detection_method)
   }
 }
 
+bool calcDetectionAreaLateralDistance(
+  const PathWithLaneId & path, const geometry_msgs::msg::Pose & target_pose,
+  const size_t target_seg_idx, const DetectionRange & da_range, const double obstacle_vel_mps,
+  LateralFarthestDetectionAreaPoint & point_with_lateral_dist, const double min_velocity)
+{
+  /**
+   * @brief relationships for interpolated polygon
+   *
+   * +(min_length,max_distance)-+ - +---+(max_length,max_distance) = outer_polygons
+   * |                                  |
+   * +--------------------------+ - +---+(max_length,min_distance) = inner_polygons
+   */
+  const double min_len = da_range.min_longitudinal_distance;
+  const double max_len = da_range.max_longitudinal_distance;
+  const double max_dst = da_range.max_lateral_distance;
+  // const double interval = da_range.interval;
+  const double offset_left = (da_range.wheel_tread / 2.0) + da_range.left_overhang;
+  const double offset_right = (da_range.wheel_tread / 2.0) + da_range.right_overhang;
+
+  //! max index is the last index of path point
+  const size_t max_index = static_cast<size_t>(path.points.size() - 1);
+  //! avoid bug with same point polygon
+  const double eps = 1e-3;
+  auto nearest_idx = planning_utils::calcPointIndexFromSegmentIndex(
+    path.points, target_pose.position, target_seg_idx);
+  // case of path point is not enough size
+  if (max_index == nearest_idx) {
+    return false;
+  }
+  auto p0 = path.points.at(nearest_idx).point;
+  auto first_idx = nearest_idx + 1;
+
+  // use ego point as start point if same point as ego is not in the path
+  const auto dist_to_nearest =
+    std::fabs(calcSignedArcLength(path.points, target_pose.position, target_seg_idx, nearest_idx));
+  if (dist_to_nearest > eps) {
+    // interpolate ego point
+    const auto & pp = path.points;
+    const double ds = calcDistance2d(pp.at(target_seg_idx), pp.at(target_seg_idx + 1));
+    const double dist_to_target_seg =
+      calcSignedArcLength(path.points, target_seg_idx, target_pose.position, target_seg_idx);
+    const double ratio = dist_to_target_seg / ds;
+    p0 = planning_utils::getLerpPathPointWithLaneId(
+      pp.at(target_seg_idx).point, pp.at(target_seg_idx + 1).point, ratio);
+
+    // new first index should be ahead of p0
+    first_idx = target_seg_idx + 1;
+  }
+
+  double ttc = 0.0;
+  double dist_sum = 0.0;
+  double length = 0;
+  // initial point of detection area polygon
+  // LineString2d left_inner_bound = {
+  //   planning_utils::calculateOffsetPoint2d(p0.pose, min_len, offset_left)};
+  // LineString2d left_outer_bound = {
+  //   planning_utils::calculateOffsetPoint2d(p0.pose, min_len, offset_left + eps)};
+  // LineString2d right_inner_bound = {
+  //   planning_utils::calculateOffsetPoint2d(p0.pose, min_len, -offset_right)};
+  // LineString2d right_outer_bound = {
+  //   planning_utils::calculateOffsetPoint2d(p0.pose, min_len, -offset_right - eps)};
+  for (size_t s = first_idx; s <= max_index; s++) {
+    const auto p1 = path.points.at(s).point;
+    const double ds = calcDistance2d(p0, p1);
+    dist_sum += ds;
+    length += ds;
+    // calculate the distance that obstacles can move until ego reach the trajectory point
+    const double v_average = 0.5 * (p0.longitudinal_velocity_mps + p1.longitudinal_velocity_mps);
+    const double v = std::max(v_average, min_velocity);
+    const double dt = ds / v;
+    ttc += dt;
+
+    // for offset calculation
+    const double max_lateral_distance_right =
+      std::min(max_dst, offset_right + ttc * obstacle_vel_mps + eps);
+    const double max_lateral_distance_left =
+      std::min(max_dst, offset_left + ttc * obstacle_vel_mps + eps);
+
+    // left bound
+    // if (da_range.use_left) {
+    //   left_inner_bound.emplace_back(
+    //     planning_utils::calculateOffsetPoint2d(p1.pose, min_len, offset_left));
+    //   left_outer_bound.emplace_back(
+    //     planning_utils::calculateOffsetPoint2d(p1.pose, min_len, max_lateral_distance_left));
+    // }
+    // right bound
+    // if (da_range.use_right) {
+    //   right_inner_bound.emplace_back(
+    //     planning_utils::calculateOffsetPoint2d(p1.pose, min_len, -offset_right));
+    //   right_outer_bound.emplace_back(
+    //     planning_utils::calculateOffsetPoint2d(p1.pose, min_len, -max_lateral_distance_right));
+    // }
+
+    // replace previous point with next point
+    p0 = p1;
+
+    // separate detection area polygon with fixed interval or at the end of detection max length
+    if (max_len < dist_sum || s == max_index) {
+      const auto point_left =
+        planning_utils::calculateOffsetPoint2d(p1.pose, min_len, max_lateral_distance_left);
+      const auto point_right =
+        planning_utils::calculateOffsetPoint2d(p1.pose, min_len, -max_lateral_distance_right);
+      point_with_lateral_dist.point_left =
+        tier4_autoware_utils::createPoint(point_left.x(), point_left.y(), 0);
+      point_with_lateral_dist.point_right =
+        tier4_autoware_utils::createPoint(point_right.x(), point_right.y(), 0);
+      point_with_lateral_dist.lateral_dist = ttc * obstacle_vel_mps;
+      return true;
+    }
+  }
+
+  return false;
+}
+
 }  // namespace run_out_utils
 }  // namespace behavior_velocity_planner

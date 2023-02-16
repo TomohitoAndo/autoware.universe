@@ -16,6 +16,7 @@
 #define SCENE_MODULE__RUN_OUT__UTILS_HPP_
 
 #include "scene_module/run_out/dynamic_obstacle.hpp"
+#include "utilization/util.hpp"
 
 #include <vehicle_info_util/vehicle_info_util.hpp>
 
@@ -225,6 +226,19 @@ PathWithLaneId extendPath(const PathWithLaneId & input, const double extend_dist
 PathPoint createExtendPathPoint(const double extend_distance, const PathPoint & goal_point);
 
 DetectionMethod toEnum(const std::string & detection_method);
+
+struct LateralFarthestDetectionAreaPoint
+{
+  geometry_msgs::msg::Point point_right;
+  geometry_msgs::msg::Point point_left;
+  double lateral_dist;
+};
+
+bool calcDetectionAreaLateralDistance(
+  const PathWithLaneId & path, const geometry_msgs::msg::Pose & target_pose,
+  const size_t target_seg_idx, const DetectionRange & da_range, const double obstacle_vel_mps,
+  LateralFarthestDetectionAreaPoint & point_with_lateral_dist, const double min_velocity = 1.0);
+
 }  // namespace run_out_utils
 }  // namespace behavior_velocity_planner
 #endif  // SCENE_MODULE__RUN_OUT__UTILS_HPP_

@@ -101,8 +101,10 @@ bool RunOutModule::modifyPathVelocity(
   if (planner_param_.approaching.enable) {
     // after a certain amount of time has elapsed since the ego stopped,
     // approach the obstacle with slow velocity
-    insertVelocityForState(
-      dynamic_obstacle, *planner_data_, planner_param_, trim_smoothed_path, *path);
+
+    //! DISABLE STOPPING FOR DEBUG
+    // insertVelocityForState(
+    //   dynamic_obstacle, *planner_data_, planner_param_, trim_smoothed_path, *path);
   } else {
     // just insert zero velocity for stopping
     insertStoppingVelocity(dynamic_obstacle, current_pose, current_vel, current_acc, *path);
@@ -169,6 +171,19 @@ Polygons2d RunOutModule::createDetectionAreaPolygon(const PathWithLaneId & smoot
   for (const auto & poly : detection_area_poly) {
     debug_ptr_->pushDetectionAreaPolygons(poly);
   }
+
+  // for lateral dist calculation
+  run_out_utils::LateralFarthestDetectionAreaPoint lateral_point_with_dist;
+  if (!run_out_utils::calcDetectionAreaLateralDistance(
+        smoothed_path, planner_data_->current_pose.pose, ego_seg_idx, da_range,
+        p.dynamic_obstacle.max_vel_kmph / 3.6, lateral_point_with_dist)) {
+    RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "failed to calculate lateral dist");
+    return detection_area_poly;
+  }
+  RCLCPP_WARN_STREAM(
+    rclcpp::get_logger("debug"), "lateral dist: " << lateral_point_with_dist.lateral_dist);
+  debug_ptr_->pushNearestCollisionPoint(lateral_point_with_dist.point_left);
+  debug_ptr_->pushNearestCollisionPoint(lateral_point_with_dist.point_right);
 
   return detection_area_poly;
 }
