@@ -1,0 +1,12 @@
+<launch>
+
+  <!-- Global parameters -->
+  <!-- Do not add "group" in order to propagate global parameters -->
+  <arg name="vehicle_model" default="gsm8"/>
+  <include file="$(find-pkg-share global_parameter_loader)/launch/global_params.launch.py">
+    <arg name="vehicle_model" value="$(var vehicle_model)"/>
+  </include>
+
+  <node pkg="lateral_nearest_map_point_publisher" exec="lateral_nearest_map_point_publisher_node" name="lateral_nearest_map_point_publisher" output="screen">
+  </node>
+</launch>
