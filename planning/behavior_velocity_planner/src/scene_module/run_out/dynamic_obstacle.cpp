@@ -278,6 +278,10 @@ DynamicObstacleCreatorForPoints::DynamicObstacleCreatorForPoints(rclcpp::Node & 
   sub_compare_map_filtered_pointcloud_ = node.create_subscription<sensor_msgs::msg::PointCloud2>(
     "~/input/compare_map_filtered_pointcloud", rclcpp::SensorDataQoS(),
     std::bind(&DynamicObstacleCreatorForPoints::onCompareMapFilteredPointCloud, this, _1));
+
+  // sub_map_pointcloud_ = node.create_subscription<sensor_msgs::msg::PointCloud2>(
+  //   "/map/pointcloud_map", rclcpp::QoS{1}.transient_local(),
+  //   std::bind(&DynamicObstacleCreatorForPoints::onMapPointCloud, this, _1));
 }
 
 std::vector<DynamicObstacle> DynamicObstacleCreatorForPoints::createDynamicObstacles()
@@ -319,6 +323,11 @@ std::vector<DynamicObstacle> DynamicObstacleCreatorForPoints::createDynamicObsta
   }
 
   return dynamic_obstacles;
+}
+
+void DynamicObstacleCreatorForPoints::calcLateralNearestStaticPoints()
+{
+  RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "oh, this is Points method!");
 }
 
 void DynamicObstacleCreatorForPoints::onCompareMapFilteredPointCloud(
@@ -365,5 +374,13 @@ void DynamicObstacleCreatorForPoints::onCompareMapFilteredPointCloud(
 
   std::lock_guard<std::mutex> lock(mutex_);
   dynamic_obstacle_data_.obstacle_points = lateral_nearest_points;
+}
+
+void DynamicObstacleCreatorForPoints::onMapPointCloud(
+  const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg)
+{
+  RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "map subscribed");
+  std::lock_guard<std::mutex> lock(mutex_);
+  map_pointcloud_ = *msg;
 }
 }  // namespace behavior_velocity_planner

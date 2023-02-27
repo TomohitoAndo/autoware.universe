@@ -100,6 +100,10 @@ public:
   explicit DynamicObstacleCreator(rclcpp::Node & node) : node_(node) {}
   virtual ~DynamicObstacleCreator() = default;
   virtual std::vector<DynamicObstacle> createDynamicObstacles() = 0;
+  virtual void calcLateralNearestStaticPoints()
+  {
+    RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "do something only Points method");
+  }
   void setParam(const DynamicObstacleParam & param) { param_ = param; }
   void setData(
     const PlannerData & planner_data, const PathWithLaneId & path, const Polygons2d & poly)
@@ -116,6 +120,7 @@ protected:
   DynamicObstacleParam param_;
   rclcpp::Node & node_;
   DynamicObstacleData dynamic_obstacle_data_;
+  sensor_msgs::msg::PointCloud2 map_pointcloud_;
 
   // mutex for dynamic_obstacle_data_
   std::mutex mutex_;
@@ -151,11 +156,15 @@ class DynamicObstacleCreatorForPoints : public DynamicObstacleCreator
 public:
   explicit DynamicObstacleCreatorForPoints(rclcpp::Node & node);
   std::vector<DynamicObstacle> createDynamicObstacles() override;
+  void calcLateralNearestStaticPoints() override;
 
 private:
   void onCompareMapFilteredPointCloud(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg);
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr
     sub_compare_map_filtered_pointcloud_;
+
+  void onMapPointCloud(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg);
+  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_map_pointcloud_;
 
   // tf
   tf2_ros::Buffer tf_buffer_;

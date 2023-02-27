@@ -22,33 +22,45 @@
 #include <motion_utils/trajectory/path_with_lane_id.hpp>
 #include <motion_utils/trajectory/trajectory.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <route_handler/route_handler.hpp>
+#include <tier4_autoware_utils/geometry/boost_geometry.hpp>
 #include <tier4_autoware_utils/geometry/geometry.hpp>
 #include <tier4_autoware_utils/geometry/pose_deviation.hpp>
 #include <tier4_autoware_utils/system/stop_watch.hpp>
 #include <vehicle_info_util/vehicle_info_util.hpp>
 
+#include <autoware_auto_mapping_msgs/msg/had_map_bin.hpp>
 #include <autoware_auto_planning_msgs/msg/path_with_lane_id.hpp>
 #include <autoware_auto_planning_msgs/msg/trajectory.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <tier4_debug_msgs/msg/float32_stamped.hpp>
 
+#include <lanelet2_core/LaneletMap.h>
+#include <lanelet2_routing/Route.h>
+#include <lanelet2_routing/RoutingGraph.h>
+#include <lanelet2_routing/RoutingGraphContainer.h>
+#include <lanelet2_traffic_rules/TrafficRulesFactory.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 
 #include <limits>
 #include <memory>
 #include <optional>
+#include <vector>
 
 namespace lateral_nearest_map_point_publisher
 {
+using autoware_auto_mapping_msgs::msg::HADMapBin;
 using autoware_auto_planning_msgs::msg::PathWithLaneId;
 using autoware_auto_planning_msgs::msg::Trajectory;
+using geometry_msgs::msg::PointStamped;
 using nav_msgs::msg::Odometry;
 using sensor_msgs::msg::PointCloud2;
 using tier4_debug_msgs::msg::Float32Stamped;
 using vehicle_info_util::VehicleInfo;
-using geometry_msgs::msg::PointStamped;
+using BasicPolygons2d = std::vector<lanelet::BasicPolygon2d>;
+using TrajectoryPoints = std::vector<autoware_auto_planning_msgs::msg::TrajectoryPoint>;
 
 struct Circle
 {
@@ -84,7 +96,10 @@ private:
   rclcpp::Subscription<PointCloud2>::SharedPtr sub_map_pointcloud_;
   rclcpp::Subscription<Odometry>::SharedPtr sub_odometry_;
   rclcpp::Subscription<Trajectory>::SharedPtr sub_trajectory_;
-  rclcpp::Publisher<PointCloud2>::SharedPtr pub_pointcloud_;
+  rclcpp::Subscription<HADMapBin>::SharedPtr sub_lanelet_map_;
+
+  rclcpp::Publisher<PointCloud2>::SharedPtr pub_ranged_pointcloud_;
+  rclcpp::Publisher<PointCloud2>::SharedPtr pub_filtered_pointcloud_;
   rclcpp::Publisher<PointStamped>::SharedPtr pub_left_nearest_point_;
   rclcpp::Publisher<Float32Stamped>::SharedPtr pub_left_nearest_distance_;
   rclcpp::Publisher<PointStamped>::SharedPtr pub_right_nearest_point_;
@@ -93,12 +108,17 @@ private:
   void onMapPointCloud(const PointCloud2::ConstSharedPtr msg);
   void onOdometry(const Odometry::ConstSharedPtr msg);
   void onTrajectory(const Trajectory::ConstSharedPtr msg);
+  void onLaneletMap(const HADMapBin::ConstSharedPtr msg);
 
   // variables
   std::unique_ptr<PointCloud2> map_pointcloud_{nullptr};
   std::unique_ptr<Odometry> odometry_{nullptr};
   tier4_autoware_utils::StopWatch<std::chrono::milliseconds> stop_watch;
   Vehicle vehicle_;
+
+  // lanelet
+  std::shared_ptr<route_handler::RouteHandler> route_handler_;
+  BasicPolygons2d partition_lanelets_;
 };
 
 }  // namespace lateral_nearest_map_point_publisher
