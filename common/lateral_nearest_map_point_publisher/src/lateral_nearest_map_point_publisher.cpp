@@ -74,7 +74,8 @@ pcl::PointCloud<pcl::PointXYZ> extractNoGroundPoints(
 }
 
 lateral_nearest_map_point_publisher::LateralNearestPoints extractLateralNearestPoints(
-  const pcl::PointCloud<pcl::PointXYZ> & points, const geometry_msgs::msg::Pose & pose)
+  const pcl::PointCloud<pcl::PointXYZ> & points, const geometry_msgs::msg::Pose & pose,
+  const double vehicle_half_width)
 {
   lateral_nearest_map_point_publisher::LateralNearestPoints lateral_nearest_points;
   lateral_nearest_points.left.distance = std::numeric_limits<double>::max();
@@ -85,12 +86,12 @@ lateral_nearest_map_point_publisher::LateralNearestPoints extractLateralNearestP
 
     if (lateral_deviation < 0) {
       if (-lateral_deviation < lateral_nearest_points.right.distance) {
-        lateral_nearest_points.right.distance = -lateral_deviation;
+        lateral_nearest_points.right.distance = -lateral_deviation - vehicle_half_width;
         lateral_nearest_points.right.point = p_ros;
       }
     } else {  // (lateral_deviation > 0)
       if (lateral_deviation < lateral_nearest_points.left.distance) {
-        lateral_nearest_points.left.distance = lateral_deviation;
+        lateral_nearest_points.left.distance = lateral_deviation - vehicle_half_width;
         lateral_nearest_points.left.point = p_ros;
       }
     }
@@ -209,6 +210,9 @@ LateralNearestMapPointPublisher::LateralNearestMapPointPublisher(
   vehicle_.base_to_front = v.wheel_base_m + v.front_overhang_m;
   vehicle_.half_width = v.vehicle_width_m / 2.0;
 
+  RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "base to front: " << vehicle_.base_to_front);
+  RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "half width: " << vehicle_.half_width);
+
   sub_map_pointcloud_ = this->create_subscription<PointCloud2>(
     "/map/pointcloud_map", rclcpp::QoS{1}.transient_local(),
     std::bind(&LateralNearestMapPointPublisher::onMapPointCloud, this, _1));
@@ -312,8 +316,8 @@ void LateralNearestMapPointPublisher::onTrajectory(const Trajectory::ConstShared
   const auto partition_excluded_points = excludeObstaclesOutSideOfPartition(
     lateral_points_around_vehicle, msg->points, partition_lanelets_, odometry_->pose.pose);
 
-  const LateralNearestPoints lateral_nearest_points =
-    extractLateralNearestPoints(partition_excluded_points, nearest_path_point.pose);
+  const LateralNearestPoints lateral_nearest_points = extractLateralNearestPoints(
+    partition_excluded_points, nearest_path_point.pose, vehicle_.half_width);
 
   // publish lateral nearest points
   const auto & lnp = lateral_nearest_points;
@@ -345,7 +349,7 @@ void LateralNearestMapPointPublisher::onTrajectory(const Trajectory::ConstShared
 
   // publish pointcloud for debug
   PointCloud2 ranged_points_ros;
-  pcl::toROSMsg(points_around_vehicle, ranged_points_ros);
+  pcl::toROSMsg(height_filtered_points, ranged_points_ros);
   ranged_points_ros.header.frame_id = map_pointcloud_->header.frame_id;
   ranged_points_ros.header.stamp = map_pointcloud_->header.stamp;
   pub_ranged_pointcloud_->publish(ranged_points_ros);
