@@ -377,6 +377,10 @@ DynamicObstacleCreatorForPoints::DynamicObstacleCreatorForPoints(
       "~/input/vector_map_inside_area_filtered_pointcloud", rclcpp::SensorDataQoS(),
       std::bind(&DynamicObstacleCreatorForPoints::onCompareMapFilteredPointCloud, this, _1));
   }
+
+  // publisher
+  pub_points_filter_time_ =
+    node.create_publisher<Float32Stamped>("~/debug/run_out/points_filter_time", 1);
 }
 
 std::vector<DynamicObstacle> DynamicObstacleCreatorForPoints::createDynamicObstacles()
@@ -474,6 +478,8 @@ void DynamicObstacleCreatorForPoints::onSynchronizedPointCloud(
     return;
   }
 
+  stop_watch_.tic();
+
   // transform pointcloud and convert to pcl points for easier handling
   const auto transform_matrix = getTransformMatrix(
     tf_buffer_, "map", compare_map_filtered_points->header.frame_id,
@@ -517,6 +523,14 @@ void DynamicObstacleCreatorForPoints::onSynchronizedPointCloud(
   // filter points that have lateral nearest distance
   const auto lateral_nearest_points =
     extractLateralNearestPoints(concat_points_no_overlap, path, param_.points_interval);
+
+  {
+    const auto points_filter_time_ms = stop_watch_.toc();
+    Float32Stamped filter_time;
+    filter_time.data = points_filter_time_ms;
+    filter_time.stamp = node_.now();
+    pub_points_filter_time_->publish(filter_time);
+  }
 
   // publish filtered pointcloud for debug
   debug_ptr_->publishFilteredPointCloud(lateral_nearest_points, concat_points.header);

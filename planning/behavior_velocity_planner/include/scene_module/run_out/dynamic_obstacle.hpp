@@ -21,9 +21,11 @@
 #include "utilization/path_utilization.hpp"
 #include "utilization/util.hpp"
 
+#include <tier4_autoware_utils/system/stop_watch.hpp>
 #include <tier4_autoware_utils/tier4_autoware_utils.hpp>
 
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <tier4_debug_msgs/msg/float32_stamped.hpp>
 
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/exact_time.h>
@@ -52,6 +54,7 @@ using run_out_utils::DynamicObstacleData;
 using run_out_utils::DynamicObstacleParam;
 using run_out_utils::PlannerParam;
 using run_out_utils::PredictedPath;
+using tier4_debug_msgs::msg::Float32Stamped;
 using PathPointsWithLaneId = std::vector<autoware_auto_planning_msgs::msg::PathPointWithLaneId>;
 
 /**
@@ -153,6 +156,8 @@ private:
     const PointCloud2::ConstSharedPtr compare_map_filtered_points,
     const PointCloud2::ConstSharedPtr vector_map_filtered_points);
 
+  rclcpp::Publisher<Float32Stamped>::SharedPtr pub_points_filter_time_;
+
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr
     sub_compare_map_filtered_pointcloud_;
 
@@ -167,6 +172,8 @@ private:
 
   // obstacle points
   pcl::PointCloud<pcl::PointXYZ> obstacle_points_map_filtered_;
+
+  tier4_autoware_utils::StopWatch<std::chrono::milliseconds> stop_watch_;
 };
 
 }  // namespace behavior_velocity_planner
