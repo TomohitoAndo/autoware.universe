@@ -106,6 +106,94 @@ bool isAheadOf(
   return is_ahead;
 }
 
+lanelet::BasicPoint2d toLaneletPoint(const Point2d & point)
+{
+  lanelet::BasicPoint2d lanelet_point(point.x(), point.y());
+  return lanelet_point;
+}
+
+Polygon2d toUnclosedPoly(const Polygon2d & poly)
+{
+  Polygon2d unclosed_poly = poly;
+  unclosed_poly.outer().erase(unclosed_poly.outer().end() - 1);
+  return unclosed_poly;
+}
+
+// calc smallest enclosing circle with average O(N) algorithm
+// reference:
+// https://erickimphotography.com/blog/wp-content/uploads/2018/09/Computational-Geometry-Algorithms-and-Applications-3rd-Ed.pdf
+std::pair<lanelet::BasicPoint2d, double> calcSmallestEnclosingCircle(const Polygon2d & poly)
+{
+  // The `eps` is used to avoid precision bugs in circle inclusion checkings.
+  // If the value of `eps` is too small, this function doesn't work well. More than 1e-10 is
+  // recommended.
+  const double eps = 1e-5;
+  lanelet::BasicPoint2d center(0.0, 0.0);
+  double radius_squared = 0.0;
+
+  auto cross = [](const lanelet::BasicPoint2d & p1, const lanelet::BasicPoint2d & p2) -> double {
+    return p1.x() * p2.y() - p1.y() * p2.x();
+  };
+
+  auto make_circle_3 = [&](
+                         const lanelet::BasicPoint2d & p1, const lanelet::BasicPoint2d & p2,
+                         const lanelet::BasicPoint2d & p3) -> void {
+    // reference for circumcenter vector https://en.wikipedia.org/wiki/Circumscribed_circle
+    const double A = (p2 - p3).squaredNorm();
+    const double B = (p3 - p1).squaredNorm();
+    const double C = (p1 - p2).squaredNorm();
+    const double S = cross(p2 - p1, p3 - p1);
+    if (std::abs(S) < eps) return;
+    center = (A * (B + C - A) * p1 + B * (C + A - B) * p2 + C * (A + B - C) * p3) / (4 * S * S);
+    radius_squared = (center - p1).squaredNorm() + eps;
+  };
+
+  auto make_circle_2 =
+    [&](const lanelet::BasicPoint2d & p1, const lanelet::BasicPoint2d & p2) -> void {
+    center = (p1 + p2) * 0.5;
+    radius_squared = (center - p1).squaredNorm() + eps;
+  };
+
+  auto in_circle = [&](const lanelet::BasicPoint2d & p) -> bool {
+    return (center - p).squaredNorm() <= radius_squared;
+  };
+
+  // mini disc
+  const auto unclosed_poly = toUnclosedPoly(poly);
+  const auto poly_outer = unclosed_poly.outer();
+  for (size_t i = 1; i < poly_outer.size(); i++) {
+    const auto p1 = toLaneletPoint(poly_outer.at(i));
+    if (in_circle(p1)) continue;
+
+    // mini disc with point
+    const auto p0 = toLaneletPoint(poly_outer.at(0));
+    make_circle_2(p0, p1);
+    for (size_t j = 0; j < i; j++) {
+      const auto p2 = toLaneletPoint(poly_outer.at(j));
+      if (in_circle(p2)) continue;
+
+      // mini disc with two points
+      make_circle_2(p1, p2);
+      for (size_t k = 0; k < j; k++) {
+        const auto p3 = toLaneletPoint(poly_outer.at(k));
+        if (in_circle(p3)) continue;
+
+        // mini disc with tree points
+        make_circle_3(p1, p2, p3);
+      }
+    }
+  }
+
+  return std::make_pair(center, radius_squared);
+}
+
+bool withinCircle(const Point2d & point, const std::pair<lanelet::BasicPoint2d, double> & circle)
+{
+  const auto & p1 = point;
+  const auto & p2 = circle.first;
+  return (std::pow(p1.x() - p2.x(), 2) + std::pow(p1.y() - p2.y(), 2)) < circle.second;
+}
+
 pcl::PointCloud<pcl::PointXYZ> extractObstaclePointsWithinPolygon(
   const pcl::PointCloud<pcl::PointXYZ> & input_points, const Polygons2d & polys)
 {
@@ -122,12 +210,18 @@ pcl::PointCloud<pcl::PointXYZ> extractObstaclePointsWithinPolygon(
   pcl::PointCloud<pcl::PointXYZ> output_points;
   output_points.header = input_points.header;
   for (const auto & poly : polys) {
-    const auto bounding_box = bg::return_envelope<tier4_autoware_utils::Box2d>(poly);
+    // const auto bounding_box = bg::return_envelope<tier4_autoware_utils::Box2d>(poly);
+    const auto enclosing_circle = calcSmallestEnclosingCircle(poly);
     for (const auto & p : input_points) {
       Point2d point(p.x, p.y);
 
-      // filter with bounding box to reduce calculation time
-      if (!bg::covered_by(point, bounding_box)) {
+      // // filter with bounding box to reduce calculation time
+      // if (!bg::covered_by(point, bounding_box)) {
+      //   continue;
+      // }
+
+      // filter with enclosing ciecle to reduce calculation time
+      if (!withinCircle(point, enclosing_circle)) {
         continue;
       }
 
