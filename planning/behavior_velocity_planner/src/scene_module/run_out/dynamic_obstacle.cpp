@@ -72,31 +72,6 @@ pcl::PointCloud<pcl::PointXYZ> applyVoxelGridFilter(
   return output_points;
 }
 
-pcl::PointCloud<pcl::PointXYZ> applyVoxelGridFilter(
-  const sensor_msgs::msg::PointCloud2 & input_points)
-{
-  if (input_points.data.empty()) {
-    return pcl::PointCloud<pcl::PointXYZ>();
-  }
-
-  pcl::PointCloud<pcl::PointXYZ> input_points_pcl;
-  pcl::fromROSMsg(input_points, input_points_pcl);
-
-  auto no_height_points = input_points_pcl;
-  for (auto & p : no_height_points) {
-    p.z = 0.0;
-  }
-
-  pcl::VoxelGrid<pcl::PointXYZ> filter;
-  filter.setInputCloud(pcl::make_shared<pcl::PointCloud<pcl::PointXYZ>>(no_height_points));
-  filter.setLeafSize(0.05f, 0.05f, 100000.0f);
-
-  pcl::PointCloud<pcl::PointXYZ> output_points;
-  filter.filter(output_points);
-
-  return output_points;
-}
-
 bool isAheadOf(
   const geometry_msgs::msg::Point & target_point, const geometry_msgs::msg::Pose & base_pose)
 {
@@ -357,18 +332,17 @@ DynamicObstacleCreatorForPoints::DynamicObstacleCreatorForPoints(
   if (param_.use_mandatory_area) {
     // Subscribe the input using message filter
     const size_t max_queue_size = 1;
-    sub_compare_map_filtered_pointcloud_sync_.subscribe(
-      &node, "~/input/compare_map_filtered_pointcloud",
+    sub_vector_map_inside_pointcloud_sync_.subscribe(
+      &node, "~/input/vector_map_outside_area_filtered_pointcloud",
       rclcpp::SensorDataQoS().keep_last(max_queue_size).get_rmw_qos_profile());
-    sub_vector_map_inside_area_filtered_pointcloud_sync_.subscribe(
+    sub_vector_map_outside_pointcloud_sync_.subscribe(
       &node, "~/input/vector_map_inside_area_filtered_pointcloud",
       rclcpp::SensorDataQoS().keep_last(max_queue_size).get_rmw_qos_profile());
 
     // sync subscribers with ExactTime Sync Policy
     exact_time_synchronizer_ = std::make_unique<ExactTimeSynchronizer>(max_queue_size);
     exact_time_synchronizer_->connectInput(
-      sub_compare_map_filtered_pointcloud_sync_,
-      sub_vector_map_inside_area_filtered_pointcloud_sync_);
+      sub_vector_map_inside_pointcloud_sync_, sub_vector_map_outside_pointcloud_sync_);
     exact_time_synchronizer_->registerCallback(
       &DynamicObstacleCreatorForPoints::onSynchronizedPointCloud, this);
   } else {
@@ -464,8 +438,8 @@ void DynamicObstacleCreatorForPoints::onCompareMapFilteredPointCloud(
 }
 
 void DynamicObstacleCreatorForPoints::onSynchronizedPointCloud(
-  const PointCloud2::ConstSharedPtr compare_map_filtered_points,
-  const PointCloud2::ConstSharedPtr vector_map_filtered_points)
+  const PointCloud2::ConstSharedPtr vector_map_inside_points,
+  const PointCloud2::ConstSharedPtr vector_map_outside_points)
 {
   // clear previous obstacle points
   {
@@ -473,7 +447,7 @@ void DynamicObstacleCreatorForPoints::onSynchronizedPointCloud(
     obstacle_points_map_filtered_.clear();
   }
 
-  if (compare_map_filtered_points->data.empty() && vector_map_filtered_points->data.empty()) {
+  if (vector_map_inside_points->data.empty() && vector_map_outside_points->data.empty()) {
     debug_ptr_->publishEmptyPointCloud();
     return;
   }
@@ -482,23 +456,23 @@ void DynamicObstacleCreatorForPoints::onSynchronizedPointCloud(
 
   // transform pointcloud and convert to pcl points for easier handling
   const auto transform_matrix = getTransformMatrix(
-    tf_buffer_, "map", compare_map_filtered_points->header.frame_id,
-    compare_map_filtered_points->header.stamp);
+    tf_buffer_, "map", vector_map_inside_points->header.frame_id,
+    vector_map_inside_points->header.stamp);
   if (!transform_matrix) {
     return;
   }
-  pcl::PointCloud<pcl::PointXYZ> compare_map_filtered_points_transformed =
-    transformPointCloud(*compare_map_filtered_points, *transform_matrix);
-  pcl::PointCloud<pcl::PointXYZ> vector_map_filtered_points_transformed =
-    transformPointCloud(*vector_map_filtered_points, *transform_matrix);
-  compare_map_filtered_points_transformed.header.frame_id = "map";
-  vector_map_filtered_points_transformed.header.frame_id = "map";
+  pcl::PointCloud<pcl::PointXYZ> vector_inside_points_transformed =
+    transformPointCloud(*vector_map_inside_points, *transform_matrix);
+  pcl::PointCloud<pcl::PointXYZ> vector_map_outside_points_transformed =
+    transformPointCloud(*vector_map_outside_points, *transform_matrix);
+  vector_inside_points_transformed.header.frame_id = "map";
+  vector_map_outside_points_transformed.header.frame_id = "map";
 
   // apply voxel grid filter to reduce calculation cost
-  const auto voxel_grid_filtered_compare_map_points =
-    applyVoxelGridFilter(compare_map_filtered_points_transformed);
-  const auto voxel_grid_filtered_vector_map_points =
-    applyVoxelGridFilter(vector_map_filtered_points_transformed);
+  const auto voxel_grid_filtered_vector_map_inside_points =
+    applyVoxelGridFilter(vector_inside_points_transformed);
+  const auto voxel_grid_filtered_vector_map_outside_points =
+    applyVoxelGridFilter(vector_map_outside_points_transformed);
 
   // these variables are written in another callback
   mutex_.lock();
@@ -508,21 +482,22 @@ void DynamicObstacleCreatorForPoints::onSynchronizedPointCloud(
   mutex_.unlock();
 
   // filter obstacle points within detection area polygon
-  const auto detection_area_filtered_compare_map_points = extractObstaclePointsWithinPolygon(
-    voxel_grid_filtered_compare_map_points, mandatory_detection_area);
-  const auto detection_area_filtered_vector_map_points =
-    extractObstaclePointsWithinPolygon(voxel_grid_filtered_vector_map_points, detection_area);
+  const auto detection_area_filtered_vector_map_inside_points = extractObstaclePointsWithinPolygon(
+    voxel_grid_filtered_vector_map_inside_points, mandatory_detection_area);
+  const auto detection_area_filtered_vector_map_outside_points = extractObstaclePointsWithinPolygon(
+    voxel_grid_filtered_vector_map_outside_points, detection_area);
 
   // concatenate two filtered pointclouds
   const auto concat_points = concatPointCloud(
-    detection_area_filtered_compare_map_points, detection_area_filtered_vector_map_points);
+    detection_area_filtered_vector_map_inside_points,
+    detection_area_filtered_vector_map_outside_points);
 
-  // remove overlap points
-  const auto concat_points_no_overlap = applyVoxelGridFilter(concat_points);
+  pcl::PointCloud<pcl::PointXYZ> concat_points_pcl;
+  pcl::fromROSMsg(concat_points, concat_points_pcl);
 
   // filter points that have lateral nearest distance
   const auto lateral_nearest_points =
-    extractLateralNearestPoints(concat_points_no_overlap, path, param_.points_interval);
+    extractLateralNearestPoints(concat_points_pcl, path, param_.points_interval);
 
   {
     const auto points_filter_time_ms = stop_watch_.toc();

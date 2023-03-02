@@ -153,8 +153,8 @@ private:
   void onCompareMapFilteredPointCloud(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg);
 
   void onSynchronizedPointCloud(
-    const PointCloud2::ConstSharedPtr compare_map_filtered_points,
-    const PointCloud2::ConstSharedPtr vector_map_filtered_points);
+    const PointCloud2::ConstSharedPtr vector_map_inside_points,
+    const PointCloud2::ConstSharedPtr vector_map_outside_points);
 
   rclcpp::Publisher<Float32Stamped>::SharedPtr pub_points_filter_time_;
 
@@ -162,8 +162,8 @@ private:
     sub_compare_map_filtered_pointcloud_;
 
   // synchronized subscribers
-  message_filters::Subscriber<PointCloud2> sub_compare_map_filtered_pointcloud_sync_;
-  message_filters::Subscriber<PointCloud2> sub_vector_map_inside_area_filtered_pointcloud_sync_;
+  message_filters::Subscriber<PointCloud2> sub_vector_map_inside_pointcloud_sync_;
+  message_filters::Subscriber<PointCloud2> sub_vector_map_outside_pointcloud_sync_;
   std::unique_ptr<ExactTimeSynchronizer> exact_time_synchronizer_;
 
   // tf
