@@ -39,8 +39,9 @@ lanelet::ConstPolygons3d calcIntersectedPolygons(
   return intersected_polygons;
 }
 
-pcl::PointCloud<pcl::PointXYZ> removePointsWithinPolygons(
-  const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud_in, const lanelet::ConstPolygons3d & polygons)
+pcl::PointCloud<pcl::PointXYZ> removePointsWithPolygons(
+  const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud_in, const lanelet::ConstPolygons3d & polygons,
+  const bool remove_inside_points)
 {
   std::vector<PolygonCgal> cgal_polys;
 
@@ -53,7 +54,7 @@ pcl::PointCloud<pcl::PointXYZ> removePointsWithinPolygons(
 
   pcl::PointCloud<pcl::PointXYZ> filtered_cloud;
   pointcloud_preprocessor::utils::remove_polygon_cgal_from_cloud(
-    *cloud_in, cgal_polys, filtered_cloud);
+    *cloud_in, cgal_polys, filtered_cloud, remove_inside_points);
 
   return filtered_cloud;
 }
@@ -68,6 +69,7 @@ VectorMapInsideAreaFilterComponent::VectorMapInsideAreaFilterComponent(
 {
   polygon_type_ =
     static_cast<std::string>(declare_parameter("polygon_type", "no_obstacle_segmentation_area"));
+  remove_inside_points_ = static_cast<bool>(declare_parameter("remove_inside_points", true));
 
   using std::placeholders::_1;
   // Set subscriber
@@ -96,7 +98,8 @@ void VectorMapInsideAreaFilterComponent::filter(
   const auto intersected_lanelets = calcIntersectedPolygons(bounding_box, polygon_lanelets_);
 
   // filter pointcloud by lanelet
-  const auto filtered_pc = removePointsWithinPolygons(pc_input, intersected_lanelets);
+  pcl::PointCloud<pcl::PointXYZ> filtered_pc;
+  filtered_pc = removePointsWithPolygons(pc_input, intersected_lanelets, remove_inside_points_);
 
   // convert to ROS message
   pcl::toROSMsg(filtered_pc, output);

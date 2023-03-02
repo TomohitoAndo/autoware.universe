@@ -49,7 +49,7 @@ void to_cgal_polygon(const lanelet::BasicPolygon2d & polygon_in, PolygonCgal & p
  */
 void remove_polygon_cgal_from_cloud(
   const sensor_msgs::msg::PointCloud2 & cloud_in, const PolygonCgal & polyline_polygon,
-  sensor_msgs::msg::PointCloud2 & cloud_out);
+  sensor_msgs::msg::PointCloud2 & cloud_out, bool remove_inside = true);
 
 /**
  * @brief remove points in the given polygon
@@ -63,14 +63,16 @@ void remove_polygon_cgal_from_cloud(
  */
 void remove_polygon_cgal_from_cloud(
   const sensor_msgs::msg::PointCloud2 & cloud_in,
-  const std::vector<PolygonCgal> & polyline_polygons, sensor_msgs::msg::PointCloud2 & cloud_out);
+  const std::vector<PolygonCgal> & polyline_polygons, sensor_msgs::msg::PointCloud2 & cloud_out,
+  bool remove_inside = true);
 
 /**
  * @brief remove points in the given polygons
  */
 void remove_polygon_cgal_from_cloud(
   const pcl::PointCloud<pcl::PointXYZ> & cloud_in,
-  const std::vector<PolygonCgal> & polyline_polygons, pcl::PointCloud<pcl::PointXYZ> & cloud_out);
+  const std::vector<PolygonCgal> & polyline_polygons, pcl::PointCloud<pcl::PointXYZ> & cloud_out,
+  bool remove_inside = true);
 
 /**
  * @brief return true if the given point is inside the at least one of the polygons

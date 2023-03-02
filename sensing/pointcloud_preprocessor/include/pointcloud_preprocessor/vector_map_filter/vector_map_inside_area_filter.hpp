@@ -44,6 +44,7 @@ private:
 
   // parameter
   std::string polygon_type_;
+  bool remove_inside_points_;
 
 public:
   PCL_MAKE_ALIGNED_OPERATOR_NEW
