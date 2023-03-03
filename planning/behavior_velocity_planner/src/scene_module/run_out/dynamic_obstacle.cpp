@@ -441,14 +441,10 @@ void DynamicObstacleCreatorForPoints::onSynchronizedPointCloud(
   const PointCloud2::ConstSharedPtr vector_map_inside_points,
   const PointCloud2::ConstSharedPtr vector_map_outside_points)
 {
-  // clear previous obstacle points
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    obstacle_points_map_filtered_.clear();
-  }
-
   if (vector_map_inside_points->data.empty() && vector_map_outside_points->data.empty()) {
     debug_ptr_->publishEmptyPointCloud();
+    std::lock_guard<std::mutex> lock(mutex_);
+    obstacle_points_map_filtered_.clear();
     return;
   }
 
