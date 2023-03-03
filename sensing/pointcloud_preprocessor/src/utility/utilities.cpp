@@ -44,93 +44,140 @@ void to_cgal_polygon(const lanelet::BasicPolygon2d & polygon_in, PolygonCgal & p
 
 void remove_polygon_cgal_from_cloud(
   const sensor_msgs::msg::PointCloud2 & cloud_in, const PolygonCgal & polyline_polygon,
-  sensor_msgs::msg::PointCloud2 & cloud_out)
+  sensor_msgs::msg::PointCloud2 & cloud_out, bool remove_inside)
 {
-  pcl::PointCloud<pcl::PointXYZ> pcl_output;
+  if (polyline_polygon.empty()) {
+    const sensor_msgs::msg::PointCloud2 empty_points;
+    cloud_out = remove_inside ? cloud_in : empty_points;
+    return;
+  }
 
+  pcl::PointCloud<pcl::PointXYZ> pointcloud_inside;
+  pcl::PointCloud<pcl::PointXYZ> pointcloud_outside;
   for (sensor_msgs::PointCloud2ConstIterator<float> iter_x(cloud_in, "x"), iter_y(cloud_in, "y"),
        iter_z(cloud_in, "z");
        iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z) {
+    pcl::PointXYZ p;
+    p.x = *iter_x;
+    p.y = *iter_y;
+    p.z = *iter_z;
+
     // check if the point is inside the polygon
     if (
       CGAL::bounded_side_2(
         polyline_polygon.begin(), polyline_polygon.end(), PointCgal(*iter_x, *iter_y), K()) ==
       CGAL::ON_UNBOUNDED_SIDE) {
-      pcl::PointXYZ p;
-      p.x = *iter_x;
-      p.y = *iter_y;
-      p.z = *iter_z;
-      pcl_output.emplace_back(p);
+      pointcloud_outside.emplace_back(p);
+    } else {
+      pointcloud_inside.emplace_back(p);
     }
   }
 
-  pcl::toROSMsg(pcl_output, cloud_out);
-  cloud_out.header = cloud_in.header;
+  if (remove_inside) {
+    pcl::toROSMsg(pointcloud_outside, cloud_out);
+    cloud_out.header = cloud_in.header;
+  } else {
+    pcl::toROSMsg(pointcloud_inside, cloud_out);
+    cloud_out.header = cloud_in.header;
+  }
 }
 
 void remove_polygon_cgal_from_cloud(
   const pcl::PointCloud<pcl::PointXYZ> & cloud_in, const PolygonCgal & polyline_polygon,
-  pcl::PointCloud<pcl::PointXYZ> & cloud_out)
+  pcl::PointCloud<pcl::PointXYZ> & cloud_out, bool remove_inside)
 {
-  cloud_out.clear();
-  cloud_out.header = cloud_in.header;
+  if (polyline_polygon.empty()) {
+    const pcl::PointCloud<pcl::PointXYZ> empty_points;
+    cloud_out = remove_inside ? cloud_in : empty_points;
+    return;
+  }
 
+  pcl::PointCloud<pcl::PointXYZ> pointcloud_inside;
+  pcl::PointCloud<pcl::PointXYZ> pointcloud_outside;
   for (const auto & p : cloud_in) {
     // check if the point is inside the polygon
     if (
       CGAL::bounded_side_2(
         polyline_polygon.begin(), polyline_polygon.end(), PointCgal(p.x, p.y), K()) ==
       CGAL::ON_UNBOUNDED_SIDE) {
-      cloud_out.emplace_back(p);
+      pointcloud_inside.emplace_back(p);
+    } else {
+      pointcloud_outside.emplace_back(p);
     }
+  }
+
+  if (remove_inside) {
+    cloud_out = pointcloud_outside;
+    cloud_out.header = cloud_in.header;
+  } else {
+    cloud_out = pointcloud_inside;
+    cloud_out.header = cloud_in.header;
   }
 }
 
 void remove_polygon_cgal_from_cloud(
   const sensor_msgs::msg::PointCloud2 & cloud_in,
-  const std::vector<PolygonCgal> & polyline_polygons, sensor_msgs::msg::PointCloud2 & cloud_out)
+  const std::vector<PolygonCgal> & polyline_polygons, sensor_msgs::msg::PointCloud2 & cloud_out,
+  bool remove_inside)
 {
   if (polyline_polygons.empty()) {
-    cloud_out = cloud_in;
+    const sensor_msgs::msg::PointCloud2 empty_points;
+    cloud_out = remove_inside ? cloud_in : empty_points;
     return;
   }
 
-  pcl::PointCloud<pcl::PointXYZ> filtered_cloud;
+  pcl::PointCloud<pcl::PointXYZ> pointcloud_inside;
+  pcl::PointCloud<pcl::PointXYZ> pointcloud_outside;
   for (sensor_msgs::PointCloud2ConstIterator<float> iter_x(cloud_in, "x"), iter_y(cloud_in, "y"),
        iter_z(cloud_in, "z");
        iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z) {
     // if the point is inside the polygon, skip inserting and check the next point
     pcl::PointXYZ p(*iter_x, *iter_y, *iter_z);
     if (point_within_cgal_polys(p, polyline_polygons)) {
-      continue;
+      pointcloud_inside.emplace_back(p);
+    } else {
+      pointcloud_outside.emplace_back(p);
     }
-    filtered_cloud.emplace_back(p);
   }
 
-  pcl::toROSMsg(filtered_cloud, cloud_out);
-  cloud_out.header = cloud_in.header;
+  if (remove_inside) {
+    pcl::toROSMsg(pointcloud_outside, cloud_out);
+    cloud_out.header = cloud_in.header;
+  } else {
+    pcl::toROSMsg(pointcloud_inside, cloud_out);
+    cloud_out.header = cloud_in.header;
+  }
 }
 
 void remove_polygon_cgal_from_cloud(
   const pcl::PointCloud<pcl::PointXYZ> & cloud_in,
-  const std::vector<PolygonCgal> & polyline_polygons, pcl::PointCloud<pcl::PointXYZ> & cloud_out)
+  const std::vector<PolygonCgal> & polyline_polygons, pcl::PointCloud<pcl::PointXYZ> & cloud_out,
+  bool remove_inside)
 {
   if (polyline_polygons.empty()) {
-    cloud_out = cloud_in;
+    const pcl::PointCloud<pcl::PointXYZ> empty_points;
+    cloud_out = remove_inside ? cloud_in : empty_points;
     return;
   }
 
-  pcl::PointCloud<pcl::PointXYZ> filtered_cloud;
+  pcl::PointCloud<pcl::PointXYZ> pointcloud_inside;
+  pcl::PointCloud<pcl::PointXYZ> pointcloud_outside;
   for (const auto & p : cloud_in) {
     // if the point is inside the polygon, skip inserting and check the next point
     if (point_within_cgal_polys(p, polyline_polygons)) {
-      continue;
+      pointcloud_inside.emplace_back(p);
+    } else {
+      pointcloud_outside.emplace_back(p);
     }
-    filtered_cloud.emplace_back(p);
   }
 
-  cloud_out = filtered_cloud;
-  cloud_out.header = cloud_in.header;
+  if (remove_inside) {
+    cloud_out = pointcloud_outside;
+    cloud_out.header = cloud_in.header;
+  } else {
+    cloud_out = pointcloud_inside;
+    cloud_out.header = cloud_in.header;
+  }
 }
 
 bool point_within_cgal_polys(
