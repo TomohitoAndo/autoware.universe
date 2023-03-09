@@ -156,20 +156,10 @@ std::pair<geometry_msgs::msg::Point, double> findLongitudinalNearestPointBehind(
   return {nearest_point, min_dist};
 }
 
-// TODO: appropriate update method
-void updatePointsBuffer(std::deque<BusStopModule::PointWithDistStamped> & points_buffer)
+// p1 is older data
+double calcPredictedVelocityFromTwoPoint(
+  const BusStopModule::PointWithDistStamped & p1, const BusStopModule::PointWithDistStamped & p2)
 {
-  if (points_buffer.size() > 2) {
-    points_buffer.pop_back();
-  }
-}
-
-double calcPredictedVelocity(const std::deque<BusStopModule::PointWithDistStamped> & points_buffer)
-{
-  // p1 is older data
-  const auto & p1 = points_buffer.back();
-  const auto & p2 = points_buffer.front();
-
   // if dist_diff is positive, the obstacle is approaching
   const double dist_diff = p1.dist - p2.dist;
   const double time_diff = (p2.stamp - p1.stamp).seconds();
@@ -217,6 +207,8 @@ BusStopModule::BusStopModule(
 {
   turn_indicator_ = std::make_shared<TurnIndicator>(node);
   state_machine_ = std::make_shared<StateMachine>(node, planner_param.state_param);
+  lpf_ = std::make_shared<LowpassFilter1d>(planner_param.lpf_gain);
+  RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "lpf_gain: " << planner_param_.lpf_gain);
 
   //! debug
   // change log level for debugging
@@ -250,9 +242,9 @@ bool BusStopModule::modifyPathVelocity(
   PointWithDistStamped point_with_dist = createPointWithDist(
     nearest_point_with_dist.first, nearest_point_with_dist.second,
     planner_data_->no_ground_pointcloud->header.stamp);
-  points_buffer_.emplace_front(point_with_dist);
-  updatePointsBuffer(points_buffer_);
-  const double predicted_vel_mps = calcPredictedVelocity(points_buffer_);
+  updatePointsBuffer(point_with_dist);
+
+  const double predicted_vel_mps = calcPredictedVelocity();
 
   //! debug
   RCLCPP_DEBUG_STREAM(
@@ -274,7 +266,8 @@ bool BusStopModule::modifyPathVelocity(
     return true;
   }
   const auto stop_dist = calcStopDistance(*path, *path_idx_with_pose);
-  const auto stop_pose = path_idx_with_pose->second;
+  const auto & stop_pose = path_idx_with_pose->second;
+  const auto & base_link_pose = planner_data_->current_pose.pose;
 
   if (current_state == State::STOP) {
     // if RTC is activated, do not insert zero velocity and go
@@ -284,8 +277,8 @@ bool BusStopModule::modifyPathVelocity(
 
     planning_utils::insertStopPoint(stop_pose.position, *path);
 
-    // virtual wall
-    debug_data_.stop_poses.push_back(stop_pose);
+    // create virtual wall at the head of the ego vehicle
+    debug_data_.stop_poses.push_back(base_link_pose);
 
     return true;
   }
@@ -298,8 +291,8 @@ bool BusStopModule::modifyPathVelocity(
 
     planning_utils::insertStopPoint(stop_pose.position, *path);
 
-    // virtual wall
-    debug_data_.stop_poses.push_back(stop_pose);
+    // create virtual wall at the head of the ego vehicle
+    debug_data_.stop_poses.push_back(base_link_pose);
 
     // Set Turn Indicator
     turn_indicator_->setTurnSignal(TurnIndicatorsCommand::ENABLE_RIGHT, clock_->now());
@@ -316,8 +309,8 @@ bool BusStopModule::modifyPathVelocity(
 
     planning_utils::insertStopPoint(stop_pose.position, *path);
 
-    // virtual wall
-    debug_data_.stop_poses.push_back(stop_pose);
+    // create virtual wall at the head of the ego vehicle
+    debug_data_.stop_poses.push_back(base_link_pose);
 
     return true;
   }
@@ -338,6 +331,8 @@ boost::optional<PathIndexWithPose> BusStopModule::calcStopPoint(const PathWithLa
   const auto stop_line = getStopLineGeometry2d();
 
   // Get stop point
+  // In this module, the ego vehicle want to keep stopping at the first stop position
+  // set the stop_margin so that the ego vehicle don't approach the stop line
   const double stop_margin = 3.0;
   const auto stop_point = arc_lane_utils::createTargetPoint(
     path, stop_line, lane_id_, stop_margin, planner_data_->vehicle_info_.max_longitudinal_offset_m);
@@ -359,6 +354,54 @@ double BusStopModule::calcStopDistance(
     stop_line_seg_idx);
 
   return stop_dist;
+}
+
+void BusStopModule::updatePointsBuffer(const BusStopModule::PointWithDistStamped & point_with_dist)
+{
+  // if there are no obstacles in detection area, clear buffer
+  if (point_with_dist.dist >= std::numeric_limits<double>::max()) {
+    points_buffer_.clear();
+    velocity_buffer_.clear();
+    velocity_buffer_lpf_.clear();
+    return;
+  }
+
+  points_buffer_.emplace_back(point_with_dist);
+  if (points_buffer_.size() > planner_param_.buffer_size) {
+    points_buffer_.pop_front();
+  }
+
+  // not enough data
+  if (points_buffer_.size() < 2) {
+    return;
+  }
+
+  const auto points_buffer_size = points_buffer_.size();
+  const auto & p1 = points_buffer_.at(points_buffer_size - 2);
+  const auto & p2 = points_buffer_.at(points_buffer_size - 1);
+  const double predicted_vel = calcPredictedVelocityFromTwoPoint(p1, p2);
+  velocity_buffer_.emplace_back(predicted_vel);
+  if (velocity_buffer_.size() > planner_param_.buffer_size) {
+    velocity_buffer_.pop_front();
+  }
+
+  const auto predicted_vel_lpf = lpf_->filter(predicted_vel);
+  velocity_buffer_lpf_.emplace_back(predicted_vel_lpf);
+  if (velocity_buffer_lpf_.size() > planner_param_.buffer_size) {
+    velocity_buffer_lpf_.pop_front();
+  }
+
+  RCLCPP_DEBUG_STREAM(rclcpp::get_logger("debug"), "predicted vel: " << predicted_vel);
+  RCLCPP_DEBUG_STREAM(rclcpp::get_logger("debug"), "predicted vel lpf: " << predicted_vel_lpf);
+}
+
+double BusStopModule::calcPredictedVelocity()
+{
+  if (velocity_buffer_lpf_.empty()) {
+    return 0.0;
+  }
+
+  return velocity_buffer_lpf_.back();
 }
 
 bool BusStopModule::isRTCActivated(const double stop_distance, const bool safe)

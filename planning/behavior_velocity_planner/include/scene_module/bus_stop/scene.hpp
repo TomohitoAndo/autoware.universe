@@ -25,6 +25,7 @@
 #include <Eigen/Core>
 #include <lanelet2_extension/regulatory_elements/bus_stop.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <signal_processing/lowpass_filter_1d.hpp>
 #include <utilization/boost_geometry_helper.hpp>
 
 #include <lanelet2_core/LaneletMap.h>
@@ -64,7 +65,8 @@ public:
 
   struct PlannerParam
   {
-    double temp;
+    size_t buffer_size;
+    double lpf_gain;
     StateMachine::StateParam state_param;
   };
 
@@ -90,6 +92,8 @@ private:
   LineString2d getStopLineGeometry2d() const;
   boost::optional<PathIndexWithPose> calcStopPoint(const PathWithLaneId & path) const;
   double calcStopDistance(const PathWithLaneId & path, const PathIndexWithPose & stop_point);
+  void updatePointsBuffer(const BusStopModule::PointWithDistStamped & point_with_dist);
+  double calcPredictedVelocity();
   bool isRTCActivated(const double stop_distance, const bool safe);
 
   // Lane id
@@ -112,6 +116,9 @@ private:
 
   // Nearest points buffer
   std::deque<PointWithDistStamped> points_buffer_;
+  std::deque<double> velocity_buffer_;
+  std::deque<double> velocity_buffer_lpf_;
+  std::shared_ptr<LowpassFilter1d> lpf_;
 };
 }  // namespace bus_stop
 }  // namespace behavior_velocity_planner
