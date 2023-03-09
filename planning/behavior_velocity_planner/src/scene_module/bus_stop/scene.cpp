@@ -226,13 +226,6 @@ BusStopModule::BusStopModule(
   }
 }
 
-LineString2d BusStopModule::getStopLineGeometry2d() const
-{
-  const lanelet::ConstLineString3d stop_line = bus_stop_reg_elem_.stopLine();
-  return planning_utils::extendLine(
-    stop_line[0], stop_line[1], planner_data_->stop_line_extend_length);
-}
-
 bool BusStopModule::modifyPathVelocity(
   PathWithLaneId * path, [[maybe_unused]] StopReason * stop_reason)
 {
@@ -247,11 +240,6 @@ bool BusStopModule::modifyPathVelocity(
   const auto obstacle_points =
     findPointsWithinPolygons(*planner_data_->no_ground_pointcloud, bus_stop_reg_elem_.busStops());
 
-  //! debug
-  RCLCPP_DEBUG_STREAM(
-    rclcpp::get_logger("debug"), "obstacle points size: " << obstacle_points.size());
-
-  // ---
   // find longitudinal nearest point behind the ego vehicle
   // use the first path point as base pose
   const auto nearest_point_with_dist =
@@ -265,49 +253,53 @@ bool BusStopModule::modifyPathVelocity(
   points_buffer_.emplace_front(point_with_dist);
   updatePointsBuffer(points_buffer_);
   const double predicted_vel_mps = calcPredictedVelocity(points_buffer_);
-  // ---
 
   //! debug
+  RCLCPP_DEBUG_STREAM(
+    rclcpp::get_logger("debug"), "obstacle points size: " << obstacle_points.size());
   RCLCPP_DEBUG_STREAM(rclcpp::get_logger("debug"), "longitudinal dist: " << point_with_dist.dist);
   RCLCPP_DEBUG_STREAM(
     rclcpp::get_logger("debug"), "predicted vel: " << predicted_vel_mps * 3.6 << " [km/h]");
 
-  // Get stop line geometry
-  const auto stop_line = getStopLineGeometry2d();
-
-  // Get stop point
-  const auto stop_point = arc_lane_utils::createTargetPoint(
-    original_path, stop_line, lane_id_, 0.0 /* stop margin */,
-    planner_data_->vehicle_info_.max_longitudinal_offset_m);
-  if (!stop_point) {
-    return true;
-  }
-  const auto & stop_point_idx = stop_point->first;
-  const auto & stop_pose = stop_point->second;
-  const size_t stop_line_seg_idx = planning_utils::calcSegmentIndexFromPointIndex(
-    path->points, stop_pose.position, stop_point_idx);
-
+  // update and current state
   state_machine_->updateState({predicted_vel_mps}, *clock_);
   const auto current_state = state_machine_->getCurrentState();
   RCLCPP_DEBUG_STREAM(
     rclcpp::get_logger("debug"), "current_state: " << toStringState(current_state));
 
-  if (current_state == State::STOP) {
-    // Insert stop point
-    planning_utils::insertStopPoint(stop_pose.position, stop_line_seg_idx, *path);
+  // calculate stop point for the stop line
+  const auto path_idx_with_pose = calcStopPoint(*path);
+  if (!path_idx_with_pose) {
+    RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "failed to calculate stop point.");
+    return true;
+  }
+  const auto stop_dist = calcStopDistance(*path, *path_idx_with_pose);
+  const auto stop_pose = path_idx_with_pose->second;
 
-    // For virtual wall
-    debug_data_.stop_poses.push_back(stop_point->second);
+  if (current_state == State::STOP) {
+    // if RTC is activated, do not insert zero velocity and go
+    if (isRTCActivated(stop_dist, false)) {
+      return true;
+    }
+
+    planning_utils::insertStopPoint(stop_pose.position, *path);
+
+    // virtual wall
+    debug_data_.stop_poses.push_back(stop_pose);
 
     return true;
   }
 
   if (current_state == State::READY) {
-    // Insert stop point
-    planning_utils::insertStopPoint(stop_pose.position, stop_line_seg_idx, *path);
+    // if RTC is activated, do not insert zero velocity and go
+    if (isRTCActivated(stop_dist, false)) {
+      return true;
+    }
 
-    // For virtual wall
-    debug_data_.stop_poses.push_back(stop_point->second);
+    planning_utils::insertStopPoint(stop_pose.position, *path);
+
+    // virtual wall
+    debug_data_.stop_poses.push_back(stop_pose);
 
     // Set Turn Indicator
     turn_indicator_->setTurnSignal(TurnIndicatorsCommand::ENABLE_RIGHT, clock_->now());
@@ -317,65 +309,64 @@ bool BusStopModule::modifyPathVelocity(
   }
 
   if (current_state == State::GO) {
+    // if RTC is activated, do not insert zero velocity and go
+    if (isRTCActivated(stop_dist, true)) {
+      return true;
+    }
+
+    planning_utils::insertStopPoint(stop_pose.position, *path);
+
+    // virtual wall
+    debug_data_.stop_poses.push_back(stop_pose);
+
     return true;
   }
 
-  //! debug
   return true;
-
-  //! RTC
-  // TODO: where to place
-  // // Get self pose
-  // const auto & self_pose = planner_data_->current_pose.pose;
-  // const size_t current_seg_idx = findEgoSegmentIndex(path->points);
-
-  // // const auto is_stopped = planner_data_->isVehicleStopped(0.0);
-  // const auto stop_dist = calcSignedArcLength(
-  //   path->points, self_pose.position, current_seg_idx, stop_pose.position, stop_line_seg_idx);
-
-  // setDistance(stop_dist);
-  // // Check state
-  // setSafe(canClearStopState());
-  // if (isActivated()) {
-  //   state_ = State::GO;
-  //   last_detection_time_ = {};
-  //   return true;
-  // }
 }
 
-bool BusStopModule::canClearStopState() const
+LineString2d BusStopModule::getStopLineGeometry2d() const
 {
-  // vehicle can clear stop state if the obstacle has never appeared in bus stop area
-  // if (!last_detection_time_) {
-  //   return true;
-  // }
-
-  // // vehicle can clear stop state if the certain time has passed since the obstacle disappeared
-  // const auto elapsed_time = clock_->now() - *last_detection_time_;
-  // if (elapsed_time.seconds() >= 2.0) {
-  //   return true;
-  // }
-
-  // // rollback in simulation mode
-  // if (elapsed_time.seconds() < 0.0) {
-  //   return true;
-  // }
-
-  return false;
+  const lanelet::ConstLineString3d stop_line = bus_stop_reg_elem_.stopLine();
+  return planning_utils::extendLine(
+    stop_line[0], stop_line[1], planner_data_->stop_line_extend_length);
 }
 
-bool BusStopModule::hasEnoughBrakingDistance(
-  const geometry_msgs::msg::Pose & self_pose, const geometry_msgs::msg::Pose & line_pose) const
+boost::optional<PathIndexWithPose> BusStopModule::calcStopPoint(const PathWithLaneId & path) const
 {
-  // get vehicle info and compute pass_judge_line_distance
-  const auto current_velocity = planner_data_->current_velocity->twist.linear.x;
-  const double max_acc = planner_data_->max_stop_acceleration_threshold;
-  const double delay_response_time = planner_data_->delay_response_time;
-  const double pass_judge_line_distance =
-    planning_utils::calcJudgeLineDistWithAccLimit(current_velocity, max_acc, delay_response_time);
+  // Get stop line geometry
+  const auto stop_line = getStopLineGeometry2d();
 
-  return arc_lane_utils::calcSignedDistance(self_pose, line_pose.position) >
-         pass_judge_line_distance;
+  // Get stop point
+  const double stop_margin = 3.0;
+  const auto stop_point = arc_lane_utils::createTargetPoint(
+    path, stop_line, lane_id_, stop_margin, planner_data_->vehicle_info_.max_longitudinal_offset_m);
+
+  return stop_point;
 }
+
+double BusStopModule::calcStopDistance(
+  const PathWithLaneId & path, const PathIndexWithPose & stop_point)
+{
+  const auto & stop_point_idx = stop_point.first;
+  const auto & stop_pose = stop_point.second;
+  const size_t stop_line_seg_idx =
+    planning_utils::calcSegmentIndexFromPointIndex(path.points, stop_pose.position, stop_point_idx);
+
+  const size_t current_seg_idx = findEgoSegmentIndex(path.points);
+  const auto stop_dist = calcSignedArcLength(
+    path.points, planner_data_->current_pose.pose.position, current_seg_idx, stop_pose.position,
+    stop_line_seg_idx);
+
+  return stop_dist;
+}
+
+bool BusStopModule::isRTCActivated(const double stop_distance, const bool safe)
+{
+  setDistance(stop_distance);
+  setSafe(safe);
+  return isActivated();
+}
+
 }  // namespace bus_stop
 }  // namespace behavior_velocity_planner

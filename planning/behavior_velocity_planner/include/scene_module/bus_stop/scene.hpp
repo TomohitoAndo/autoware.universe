@@ -88,13 +88,9 @@ public:
 
 private:
   LineString2d getStopLineGeometry2d() const;
-
-  // std::vector<geometry_msgs::msg::Point> getObstaclePoints() const;
-
-  bool canClearStopState() const;
-
-  bool hasEnoughBrakingDistance(
-    const geometry_msgs::msg::Pose & self_pose, const geometry_msgs::msg::Pose & line_pose) const;
+  boost::optional<PathIndexWithPose> calcStopPoint(const PathWithLaneId & path) const;
+  double calcStopDistance(const PathWithLaneId & path, const PathIndexWithPose & stop_point);
+  bool isRTCActivated(const double stop_distance, const bool safe);
 
   // Lane id
   int64_t lane_id_;

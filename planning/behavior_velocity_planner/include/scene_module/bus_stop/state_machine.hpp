@@ -66,8 +66,9 @@ private:
   StateParam state_param_;
 
   OperationModeState current_operation_mode_;
-  // Time elapsed since the start of the blinker
+  // Time elapsed since the start of the blinking of turn signal
   std::shared_ptr<const rclcpp::Time> put_turn_signal_time_;
+  std::shared_ptr<const rclcpp::Time> last_obstacle_detection_time_;
 
   // mutex for current_operation_mode_
   std::mutex mutex_;

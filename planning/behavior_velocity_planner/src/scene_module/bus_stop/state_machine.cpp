@@ -47,9 +47,9 @@ void StateMachine::updateState(const StateInput & state_input, rclcpp::Clock & c
   mutex_.unlock();
 
   //! debug
-  if (state_input.predicted_obstacle_vel_mps < -10) {
-    put_turn_signal_time_ = std::make_shared<rclcpp::Time>(clock.now());
-  }
+  // if (state_input.predicted_obstacle_vel_mps < -10) {
+  //   put_turn_signal_time_ = std::make_shared<rclcpp::Time>(clock.now());
+  // }
 
   // KEEP stopping
   if (state_ == State::STOP) {
@@ -84,10 +84,22 @@ void StateMachine::updateState(const StateInput & state_input, rclcpp::Clock & c
       state_input.predicted_obstacle_vel_mps >
       kmph2mps(state_param_.safe_obstacle_vel_threshold_kmph)) {
       // keep READY state
+      last_obstacle_detection_time_ = std::make_shared<const rclcpp::Time>(clock.now());
       return;
     }
 
     // time_from_turn_signal > threshold && predicted_obstacle_vel < threshold
+    // keep stopping for a certain time after the obstacle is detected
+    if (last_obstacle_detection_time_) {
+      const auto time_from_last_detection = clock.now() - *last_obstacle_detection_time_;
+      RCLCPP_DEBUG_STREAM(
+        rclcpp::get_logger("debug"),
+        "time from last detection: " << time_from_last_detection.seconds());
+      if (time_from_last_detection.seconds() < state_param_.keep_stopping_duration) {
+        return;
+      }
+    }
+
     state_ = State::GO;
     return;
   }
