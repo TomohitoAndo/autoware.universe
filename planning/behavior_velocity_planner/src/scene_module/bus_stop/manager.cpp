@@ -26,21 +26,20 @@
 
 namespace behavior_velocity_planner
 {
+namespace bus_stop
+{
 using lanelet::autoware::BusStop;
 
 BusStopModuleManager::BusStopModuleManager(rclcpp::Node & node)
-: SceneModuleManagerInterfaceWithRTC(node, getModuleName())
+: SceneModuleManagerInterfaceWithRTC(node, getModuleName()), node_(node)
 {
   const std::string ns(getModuleName());
-  planner_param_.stop_margin = node.declare_parameter(ns + ".stop_margin", 0.0);
-  planner_param_.use_dead_line = node.declare_parameter(ns + ".use_dead_line", false);
-  planner_param_.dead_line_margin = node.declare_parameter(ns + ".dead_line_margin", 5.0);
-  planner_param_.use_pass_judge_line = node.declare_parameter(ns + ".use_pass_judge_line", false);
-  planner_param_.state_clear_time = node.declare_parameter(ns + ".state_clear_time", 2.0);
-  planner_param_.hold_stop_margin_distance =
-    node.declare_parameter(ns + ".hold_stop_margin_distance", 0.0);
-
-  turn_indicator_ = std::make_shared<TurnIndicator>(node);
+  planner_param_.state_param.turn_signal_blinking_duration =
+    node.declare_parameter(ns + ".turn_signal_blinking_duration", 3.0);
+  planner_param_.state_param.safe_obstacle_vel_threshold_kmph =
+    node.declare_parameter(ns + ".safe_obstacle_vel_threshold_kmph", 3.0);
+  planner_param_.state_param.keep_stopping_duration =
+    node.declare_parameter(ns + ".keep_stopping_duration", 2.0);
 }
 
 void BusStopModuleManager::launchNewModules(
@@ -54,7 +53,7 @@ void BusStopModuleManager::launchNewModules(
     const auto module_id = bus_stop_with_lane_id.first->id();
     if (!isModuleRegistered(module_id)) {
       registerModule(std::make_shared<BusStopModule>(
-        module_id, lane_id, *bus_stop_with_lane_id.first, turn_indicator_, planner_param_,
+        module_id, lane_id, *bus_stop_with_lane_id.first, planner_param_, node_,
         logger_.get_child("bus_stop_module"), clock_));
       generateUUID(module_id);
       updateRTCStatus(
@@ -75,4 +74,5 @@ BusStopModuleManager::getModuleExpiredFunction(
   };
 }
 
+}  // namespace bus_stop
 }  // namespace behavior_velocity_planner

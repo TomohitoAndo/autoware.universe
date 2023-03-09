@@ -27,6 +27,8 @@
 
 namespace behavior_velocity_planner
 {
+namespace bus_stop
+{
 using tier4_autoware_utils::appendMarkerArray;
 using tier4_autoware_utils::createDefaultMarker;
 using tier4_autoware_utils::createMarkerColor;
@@ -181,4 +183,5 @@ visualization_msgs::msg::MarkerArray BusStopModule::createVirtualWallMarkerArray
   return wall_marker;
 }
 
+}  // namespace bus_stop
 }  // namespace behavior_velocity_planner

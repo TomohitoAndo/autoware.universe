@@ -17,6 +17,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <scene_module/bus_stop/scene.hpp>
+#include <scene_module/bus_stop/state_machine.hpp>
 #include <scene_module/bus_stop/turn_indicator.hpp>
 #include <scene_module/scene_module_interface.hpp>
 
@@ -27,11 +28,12 @@
 
 namespace behavior_velocity_planner
 {
+namespace bus_stop
+{
 class BusStopModuleManager : public SceneModuleManagerInterfaceWithRTC
 {
 public:
   explicit BusStopModuleManager(rclcpp::Node & node);
-
   const char * getModuleName() override { return "bus_stop"; }
 
 private:
@@ -43,7 +45,10 @@ private:
     const autoware_auto_planning_msgs::msg::PathWithLaneId & path) override;
 
   std::shared_ptr<TurnIndicator> turn_indicator_;
+  std::shared_ptr<StateMachine> state_machine_;
+  rclcpp::Node & node_;
 };
+}  // namespace bus_stop
 }  // namespace behavior_velocity_planner
 
 #endif  // SCENE_MODULE__BUS_STOP__MANAGER_HPP_

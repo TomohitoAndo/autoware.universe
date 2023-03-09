@@ -15,6 +15,7 @@
 #ifndef SCENE_MODULE__BUS_STOP__SCENE_HPP_
 #define SCENE_MODULE__BUS_STOP__SCENE_HPP_
 
+#include "scene_module/bus_stop/state_machine.hpp"
 #include "scene_module/bus_stop/turn_indicator.hpp"
 #include "scene_module/scene_module_interface.hpp"
 
@@ -37,18 +38,20 @@
 
 namespace behavior_velocity_planner
 {
+namespace bus_stop
+{
 using PathIndexWithPose = std::pair<size_t, geometry_msgs::msg::Pose>;  // front index, pose
 using PathIndexWithPoint2d = std::pair<size_t, Point2d>;                // front index, point2d
 using PathIndexWithOffset = std::pair<size_t, double>;                  // front index, offset
 using autoware_auto_planning_msgs::msg::PathWithLaneId;
 using tier4_planning_msgs::msg::StopFactor;
 using tier4_planning_msgs::msg::StopReason;
+using StateMachine = bus_stop::StateMachine;
+using State = StateMachine::State;
 
 class BusStopModule : public SceneModuleInterface
 {
 public:
-  enum class State { GO, STOP };
-
   struct DebugData
   {
     double base_link2front;
@@ -61,12 +64,8 @@ public:
 
   struct PlannerParam
   {
-    double stop_margin;
-    bool use_dead_line;
-    double dead_line_margin;
-    bool use_pass_judge_line;
-    double state_clear_time;
-    double hold_stop_margin_distance;
+    double temp;
+    StateMachine::StateParam state_param;
   };
 
   struct PointWithDistStamped
@@ -79,9 +78,8 @@ public:
 public:
   BusStopModule(
     const int64_t module_id, const int64_t lane_id,
-    const lanelet::autoware::BusStop & bus_stop_reg_elem,
-    const std::shared_ptr<TurnIndicator> turn_indicator, const PlannerParam & planner_param,
-    const rclcpp::Logger logger, const rclcpp::Clock::SharedPtr clock);
+    const lanelet::autoware::BusStop & bus_stop_reg_elem, const PlannerParam & planner_param,
+    rclcpp::Node & node, const rclcpp::Logger logger, const rclcpp::Clock::SharedPtr clock);
 
   bool modifyPathVelocity(PathWithLaneId * path, StopReason * stop_reason) override;
 
@@ -107,9 +105,8 @@ private:
   // For publishing turn indicator
   std::shared_ptr<TurnIndicator> turn_indicator_;
 
-  // State
-  State state_;
-  std::shared_ptr<const rclcpp::Time> last_obstacle_found_time_;
+  // For handling states
+  std::shared_ptr<StateMachine> state_machine_;
 
   // Parameter
   PlannerParam planner_param_;
@@ -117,12 +114,10 @@ private:
   // Debug
   DebugData debug_data_;
 
-  // Time elapsed since the start of the blinker
-  std::shared_ptr<const rclcpp::Time> put_turn_indicator_time_;
-
   // Nearest points buffer
   std::deque<PointWithDistStamped> points_buffer_;
 };
+}  // namespace bus_stop
 }  // namespace behavior_velocity_planner
 
 #endif  // SCENE_MODULE__BUS_STOP__SCENE_HPP_
