@@ -15,6 +15,7 @@
 #ifndef SCENE_MODULE__BUS_STOP__SCENE_HPP_
 #define SCENE_MODULE__BUS_STOP__SCENE_HPP_
 
+#include "scene_module/bus_stop/debug.hpp"
 #include "scene_module/bus_stop/state_machine.hpp"
 #include "scene_module/bus_stop/turn_indicator.hpp"
 #include "scene_module/scene_module_interface.hpp"
@@ -27,6 +28,8 @@
 #include <rclcpp/rclcpp.hpp>
 #include <signal_processing/lowpass_filter_1d.hpp>
 #include <utilization/boost_geometry_helper.hpp>
+
+#include <tier4_debug_msgs/msg/float32_stamped.hpp>
 
 #include <lanelet2_core/LaneletMap.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -45,6 +48,7 @@ using PathIndexWithPose = std::pair<size_t, geometry_msgs::msg::Pose>;  // front
 using PathIndexWithPoint2d = std::pair<size_t, Point2d>;                // front index, point2d
 using PathIndexWithOffset = std::pair<size_t, double>;                  // front index, offset
 using autoware_auto_planning_msgs::msg::PathWithLaneId;
+using tier4_debug_msgs::msg::Float32Stamped;
 using tier4_planning_msgs::msg::StopFactor;
 using tier4_planning_msgs::msg::StopReason;
 using StateMachine = bus_stop::StateMachine;
@@ -53,20 +57,13 @@ using State = StateMachine::State;
 class BusStopModule : public SceneModuleInterface
 {
 public:
-  struct DebugData
-  {
-    double base_link2front;
-    std::vector<geometry_msgs::msg::Pose> stop_poses;
-    std::vector<geometry_msgs::msg::Pose> dead_line_poses;
-    geometry_msgs::msg::Pose first_stop_pose;
-    std::vector<geometry_msgs::msg::Point> obstacle_points;
-    geometry_msgs::msg::Point nearest_point;
-  };
-
   struct PlannerParam
   {
     size_t buffer_size;
+    bool use_lpf;
     double lpf_gain;
+    double safe_obstacle_vel_threshold_kmph;
+    size_t num_safe_vel_threshold;
     StateMachine::StateParam state_param;
   };
 
@@ -94,6 +91,8 @@ private:
   double calcStopDistance(const PathWithLaneId & path, const PathIndexWithPose & stop_point);
   void updatePointsBuffer(const BusStopModule::PointWithDistStamped & point_with_dist);
   double calcPredictedVelocity();
+  double calcPredictedVelocityLpf();
+  bool judgeSafetyFromObstacleVelocity(const std::deque<double> & velocity_buffer);
   bool isRTCActivated(const double stop_distance, const bool safe);
 
   // Lane id
@@ -108,11 +107,11 @@ private:
   // For handling states
   std::shared_ptr<StateMachine> state_machine_;
 
+  // For handling debug data
+  std::shared_ptr<DebugData> debug_data_;
+
   // Parameter
   PlannerParam planner_param_;
-
-  // Debug
-  DebugData debug_data_;
 
   // Nearest points buffer
   std::deque<PointWithDistStamped> points_buffer_;

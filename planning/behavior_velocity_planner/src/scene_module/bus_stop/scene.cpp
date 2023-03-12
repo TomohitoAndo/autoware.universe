@@ -41,6 +41,101 @@ using tier4_autoware_utils::calcLongitudinalDeviation;
 
 namespace
 {
+lanelet::BasicPoint3d getCentroidPoint(const lanelet::BasicPolygon3d & poly)
+{
+  lanelet::BasicPoint3d p_sum{0.0, 0.0, 0.0};
+  for (const auto & p : poly) {
+    p_sum += p;
+  }
+  return p_sum / poly.size();
+}
+
+geometry_msgs::msg::Point toROSMsg(const lanelet::BasicPoint3d & point)
+{
+  geometry_msgs::msg::Point msg;
+  msg.x = point.x();
+  msg.y = point.y();
+  msg.z = point.z();
+  return msg;
+}
+
+visualization_msgs::msg::MarkerArray createCorrespondenceMarkerArray(
+  const lanelet::autoware::BusStop & bus_stop_reg_elem, const rclcpp::Time & now)
+{
+  visualization_msgs::msg::MarkerArray msg;
+
+  const lanelet::ConstLineString3d stop_line = bus_stop_reg_elem.stopLine();
+  const auto stop_line_center_point =
+    (stop_line.front().basicPoint() + stop_line.back().basicPoint()) / 2;
+
+  // ID
+  {
+    auto marker = createDefaultMarker(
+      "map", now, "bus_stop_id", bus_stop_reg_elem.id(),
+      visualization_msgs::msg::Marker::TEXT_VIEW_FACING, createMarkerScale(0.0, 0.0, 1.0),
+      createMarkerColor(1.0, 1.0, 1.0, 0.999));
+    marker.lifetime = rclcpp::Duration::from_seconds(0.5);
+
+    for (const auto & bus_stop : bus_stop_reg_elem.busStops()) {
+      const auto poly = bus_stop.basicPolygon();
+
+      marker.pose.position = toROSMsg(poly.front());
+      marker.pose.position.z += 2.0;
+      marker.text = std::to_string(bus_stop_reg_elem.id());
+
+      msg.markers.push_back(marker);
+    }
+  }
+
+  // Polygon
+  {
+    auto marker = createDefaultMarker(
+      "map", now, "bus_stop_polygon", bus_stop_reg_elem.id(),
+      visualization_msgs::msg::Marker::LINE_LIST, createMarkerScale(0.1, 0.0, 0.0),
+      createMarkerColor(0.1, 0.1, 1.0, 0.500));
+    marker.lifetime = rclcpp::Duration::from_seconds(0.5);
+
+    for (const auto & bus_stop : bus_stop_reg_elem.busStops()) {
+      const auto poly = bus_stop.basicPolygon();
+
+      for (size_t i = 0; i < poly.size(); ++i) {
+        const auto idx_front = i;
+        const auto idx_back = (i == poly.size() - 1) ? 0 : i + 1;
+
+        const auto & p_front = poly.at(idx_front);
+        const auto & p_back = poly.at(idx_back);
+
+        marker.points.push_back(toROSMsg(p_front));
+        marker.points.push_back(toROSMsg(p_back));
+      }
+    }
+
+    msg.markers.push_back(marker);
+  }
+
+  // Polygon to StopLine
+  {
+    auto marker = createDefaultMarker(
+      "map", now, "bus_stop_correspondence", bus_stop_reg_elem.id(),
+      visualization_msgs::msg::Marker::LINE_LIST, createMarkerScale(0.1, 0.0, 0.0),
+      createMarkerColor(0.1, 0.1, 1.0, 0.500));
+    marker.lifetime = rclcpp::Duration::from_seconds(0.5);
+
+    for (const auto & bus_stop : bus_stop_reg_elem.busStops()) {
+      const auto poly = bus_stop.basicPolygon();
+      const auto centroid_point = getCentroidPoint(poly);
+      for (size_t i = 0; i < poly.size(); ++i) {
+        marker.points.push_back(toROSMsg(centroid_point));
+        marker.points.push_back(toROSMsg(stop_line_center_point));
+      }
+    }
+
+    msg.markers.push_back(marker);
+  }
+
+  return msg;
+}
+
 // calc smallest enclosing circle with average O(N) algorithm
 // reference:
 // https://erickimphotography.com/blog/wp-content/uploads/2018/09/Computational-Geometry-Algorithms-and-Applications-3rd-Ed.pdf
@@ -130,38 +225,31 @@ std::vector<geometry_msgs::msg::Point> findPointsWithinPolygons(
   return obstacle_points;
 }
 
-// TODO: use optional?
-// find longitudinal nearest point in the behind of the base_pose
-std::pair<geometry_msgs::msg::Point, double> findLongitudinalNearestPointBehind(
+// find longitudinal nearest point from base_pose
+std::pair<geometry_msgs::msg::Point, double> findLongitudinalForwardPoint(
   const std::vector<geometry_msgs::msg::Point> & input_points,
   const geometry_msgs::msg::Pose & base_pose)
 {
-  double min_dist = std::numeric_limits<double>::max();
-  geometry_msgs::msg::Point nearest_point;
+  double max_dist = -std::numeric_limits<double>::max();
+  geometry_msgs::msg::Point forward_point;
 
   for (const auto & p : input_points) {
     const auto longitudinal_deviation = calcLongitudinalDeviation(base_pose, p);
 
-    // ignore the points ahead of the base_pose
-    if (longitudinal_deviation > 0) {
-      continue;
-    }
-
-    if (-longitudinal_deviation < min_dist) {
-      min_dist = -longitudinal_deviation;
-      nearest_point = p;
+    if (longitudinal_deviation > max_dist) {
+      max_dist = longitudinal_deviation;
+      forward_point = p;
     }
   }
 
-  return {nearest_point, min_dist};
+  return {forward_point, max_dist};
 }
 
 // p1 is older data
 double calcPredictedVelocityFromTwoPoint(
   const BusStopModule::PointWithDistStamped & p1, const BusStopModule::PointWithDistStamped & p2)
 {
-  // if dist_diff is positive, the obstacle is approaching
-  const double dist_diff = p1.dist - p2.dist;
+  const double dist_diff = p2.dist - p1.dist;
   const double time_diff = (p2.stamp - p1.stamp).seconds();
   const double vel_mps = dist_diff / time_diff;
   return vel_mps;
@@ -194,6 +282,15 @@ std::string toStringState(const StateMachine::State & state)
       return "UNKNOWN";
   }
 }
+
+template <class T>
+void pushDataToBuffer(const T & data, const size_t max_size, std::deque<T> & buffer)
+{
+  buffer.emplace_back(data);
+  if (buffer.size() > max_size) {
+    buffer.pop_front();
+  }
+}
 }  // namespace
 
 BusStopModule::BusStopModule(
@@ -208,7 +305,9 @@ BusStopModule::BusStopModule(
   turn_indicator_ = std::make_shared<TurnIndicator>(node);
   state_machine_ = std::make_shared<StateMachine>(node, planner_param.state_param);
   lpf_ = std::make_shared<LowpassFilter1d>(planner_param.lpf_gain);
-  RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "lpf_gain: " << planner_param_.lpf_gain);
+  debug_data_ = std::make_shared<DebugData>(node);
+
+  RCLCPP_INFO_STREAM(rclcpp::get_logger("debug"), "lpf_gain: " << planner_param_.lpf_gain);
 
   //! debug
   // change log level for debugging
@@ -225,8 +324,11 @@ bool BusStopModule::modifyPathVelocity(
   const auto original_path = *path;
 
   // Reset debug data
-  debug_data_ = DebugData();
-  debug_data_.base_link2front = planner_data_->vehicle_info_.max_longitudinal_offset_m;
+  debug_data_->clearDebugData();
+  if (!debug_data_->base_link2front) {
+    debug_data_->base_link2front =
+      std::make_shared<double>(planner_data_->vehicle_info_.max_longitudinal_offset_m);
+  }
 
   // Find obstacles in the bus stop area
   const auto obstacle_points =
@@ -235,8 +337,8 @@ bool BusStopModule::modifyPathVelocity(
   // find longitudinal nearest point behind the ego vehicle
   // use the first path point as base pose
   const auto nearest_point_with_dist =
-    findLongitudinalNearestPointBehind(obstacle_points, path->points.at(0).point.pose);
-  debug_data_.nearest_point = nearest_point_with_dist.first;
+    findLongitudinalForwardPoint(obstacle_points, path->points.at(0).point.pose);
+  debug_data_->nearest_point = nearest_point_with_dist.first;
 
   // update buffer and calculate predicted velocity from nearest obstacle point
   PointWithDistStamped point_with_dist = createPointWithDist(
@@ -244,20 +346,26 @@ bool BusStopModule::modifyPathVelocity(
     planner_data_->no_ground_pointcloud->header.stamp);
   updatePointsBuffer(point_with_dist);
 
-  const double predicted_vel_mps = calcPredictedVelocity();
+  bool is_safe_velocity;
+  if (planner_param_.use_lpf) {
+    is_safe_velocity = judgeSafetyFromObstacleVelocity(velocity_buffer_lpf_);
+  } else {
+    is_safe_velocity = judgeSafetyFromObstacleVelocity(velocity_buffer_);
+  }
+
+  // update and current state
+  state_machine_->updateState({is_safe_velocity}, *clock_);
+  const auto current_state = state_machine_->getCurrentState();
 
   //! debug
   RCLCPP_DEBUG_STREAM(
     rclcpp::get_logger("debug"), "obstacle points size: " << obstacle_points.size());
   RCLCPP_DEBUG_STREAM(rclcpp::get_logger("debug"), "longitudinal dist: " << point_with_dist.dist);
   RCLCPP_DEBUG_STREAM(
-    rclcpp::get_logger("debug"), "predicted vel: " << predicted_vel_mps * 3.6 << " [km/h]");
-
-  // update and current state
-  state_machine_->updateState({predicted_vel_mps}, *clock_);
-  const auto current_state = state_machine_->getCurrentState();
-  RCLCPP_DEBUG_STREAM(
     rclcpp::get_logger("debug"), "current_state: " << toStringState(current_state));
+  debug_data_->pushPredictedVelKmph(velocity_buffer_.back() * 3.6);
+  debug_data_->pushPredictedVelLpfKmph(velocity_buffer_lpf_.back() * 3.6);
+  debug_data_->publishDebugValue();
 
   // calculate stop point for the stop line
   const auto path_idx_with_pose = calcStopPoint(*path);
@@ -278,7 +386,7 @@ bool BusStopModule::modifyPathVelocity(
     planning_utils::insertStopPoint(stop_pose.position, *path);
 
     // create virtual wall at the head of the ego vehicle
-    debug_data_.stop_poses.push_back(base_link_pose);
+    debug_data_->stop_poses.push_back(base_link_pose);
 
     return true;
   }
@@ -292,7 +400,7 @@ bool BusStopModule::modifyPathVelocity(
     planning_utils::insertStopPoint(stop_pose.position, *path);
 
     // create virtual wall at the head of the ego vehicle
-    debug_data_.stop_poses.push_back(base_link_pose);
+    debug_data_->stop_poses.push_back(base_link_pose);
 
     // Set Turn Indicator
     turn_indicator_->setTurnSignal(TurnIndicatorsCommand::ENABLE_RIGHT, clock_->now());
@@ -310,7 +418,7 @@ bool BusStopModule::modifyPathVelocity(
     planning_utils::insertStopPoint(stop_pose.position, *path);
 
     // create virtual wall at the head of the ego vehicle
-    debug_data_.stop_poses.push_back(base_link_pose);
+    debug_data_->stop_poses.push_back(base_link_pose);
 
     return true;
   }
@@ -359,11 +467,20 @@ double BusStopModule::calcStopDistance(
 void BusStopModule::updatePointsBuffer(const BusStopModule::PointWithDistStamped & point_with_dist)
 {
   // if there are no obstacles in detection area, clear buffer
-  if (point_with_dist.dist >= std::numeric_limits<double>::max()) {
+  // push 0.0 to velocity buffer so we know it is safe
+  const double dist_thresh = 10000;
+  if (std::abs(point_with_dist.dist) > dist_thresh) {
     points_buffer_.clear();
+    pushDataToBuffer(0.0, planner_param_.buffer_size, velocity_buffer_);
+    pushDataToBuffer(0.0, planner_param_.buffer_size, velocity_buffer_lpf_);
+    return;
+  }
+
+  // if previously there are no obstacles and there are the obstacle at current cycle,
+  // clear buffer to predict velocity precisely
+  if (points_buffer_.empty()) {
     velocity_buffer_.clear();
     velocity_buffer_lpf_.clear();
-    return;
   }
 
   points_buffer_.emplace_back(point_with_dist);
@@ -380,28 +497,29 @@ void BusStopModule::updatePointsBuffer(const BusStopModule::PointWithDistStamped
   const auto & p1 = points_buffer_.at(points_buffer_size - 2);
   const auto & p2 = points_buffer_.at(points_buffer_size - 1);
   const double predicted_vel = calcPredictedVelocityFromTwoPoint(p1, p2);
-  velocity_buffer_.emplace_back(predicted_vel);
-  if (velocity_buffer_.size() > planner_param_.buffer_size) {
-    velocity_buffer_.pop_front();
-  }
+  pushDataToBuffer(predicted_vel, planner_param_.buffer_size, velocity_buffer_);
 
   const auto predicted_vel_lpf = lpf_->filter(predicted_vel);
-  velocity_buffer_lpf_.emplace_back(predicted_vel_lpf);
-  if (velocity_buffer_lpf_.size() > planner_param_.buffer_size) {
-    velocity_buffer_lpf_.pop_front();
-  }
-
-  RCLCPP_DEBUG_STREAM(rclcpp::get_logger("debug"), "predicted vel: " << predicted_vel);
-  RCLCPP_DEBUG_STREAM(rclcpp::get_logger("debug"), "predicted vel lpf: " << predicted_vel_lpf);
+  pushDataToBuffer(predicted_vel_lpf, planner_param_.buffer_size, velocity_buffer_lpf_);
 }
 
-double BusStopModule::calcPredictedVelocity()
+bool BusStopModule::judgeSafetyFromObstacleVelocity(const std::deque<double> & velocity_buffer)
 {
-  if (velocity_buffer_lpf_.empty()) {
-    return 0.0;
+  if (velocity_buffer.size() < planner_param_.buffer_size) {
+    return false;
   }
 
-  return velocity_buffer_lpf_.back();
+  // count the number of velocity which is less than threshold
+  const auto safe_vel_mps = planner_param_.safe_obstacle_vel_threshold_kmph / 3.6;
+  const size_t safe_vel_count = std::count_if(
+    velocity_buffer.cbegin(), velocity_buffer.cend(),
+    [safe_vel_mps](const double velocity) -> bool { return velocity < safe_vel_mps; });
+  RCLCPP_DEBUG_STREAM(rclcpp::get_logger("debug"), "safe_vel_count: " << safe_vel_count);
+  if (safe_vel_count >= planner_param_.num_safe_vel_threshold) {
+    return true;
+  }
+
+  return false;
 }
 
 bool BusStopModule::isRTCActivated(const double stop_distance, const bool safe)
@@ -409,6 +527,42 @@ bool BusStopModule::isRTCActivated(const double stop_distance, const bool safe)
   setDistance(stop_distance);
   setSafe(safe);
   return isActivated();
+}
+
+visualization_msgs::msg::MarkerArray BusStopModule::createDebugMarkerArray()
+{
+  visualization_msgs::msg::MarkerArray debug_marker;
+  const rclcpp::Time now = clock_->now();
+
+  if (!debug_data_->stop_poses.empty()) {
+    appendMarkerArray(createCorrespondenceMarkerArray(bus_stop_reg_elem_, now), &debug_marker, now);
+
+    auto nearest_obstacle_marker = createDefaultMarker(
+      "map", now, "nearest_obstacle", module_id_, visualization_msgs::msg::Marker::SPHERE,
+      createMarkerScale(0.6, 0.6, 0.6), createMarkerColor(1.0, 0, 0, 0.999));
+    nearest_obstacle_marker.pose.position = debug_data_->nearest_point;
+    nearest_obstacle_marker.lifetime = rclcpp::Duration::from_seconds(0.3);
+    debug_marker.markers.emplace_back(nearest_obstacle_marker);
+  }
+
+  return debug_marker;
+}
+
+visualization_msgs::msg::MarkerArray BusStopModule::createVirtualWallMarkerArray()
+{
+  visualization_msgs::msg::MarkerArray wall_marker;
+
+  const rclcpp::Time now = clock_->now();
+
+  auto id = getModuleId();
+  for (const auto & p : debug_data_->stop_poses) {
+    const auto p_front =
+      tier4_autoware_utils::calcOffsetPose(p, *debug_data_->base_link2front, 0.0, 0.0);
+    appendMarkerArray(
+      motion_utils::createStopVirtualWallMarker(p_front, "bus_stop", now, id++), &wall_marker, now);
+  }
+
+  return wall_marker;
 }
 
 }  // namespace bus_stop

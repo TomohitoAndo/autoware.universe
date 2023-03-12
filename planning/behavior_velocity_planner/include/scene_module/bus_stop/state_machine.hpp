@@ -42,13 +42,12 @@ public:
   struct StateParam
   {
     double turn_signal_blinking_duration;
-    double safe_obstacle_vel_threshold_kmph;
     double keep_stopping_duration;
   };
 
   struct StateInput
   {
-    double predicted_obstacle_vel_mps;
+    bool is_safe_velocty;
   };
 
   explicit StateMachine(rclcpp::Node & node, const StateParam & state_param);
