@@ -58,6 +58,8 @@ private:
   rclcpp::Publisher<autoware_perception_msgs::msg::TrafficSignal>::SharedPtr pub_tl_state_;
 
   boost::optional<int> first_ref_stop_path_point_index_;
+
+  std::shared_ptr<DebugDataPublisher> debug_data_publisher_;
 };
 
 class TrafficLightModulePlugin : public PluginWrapper<TrafficLightModuleManager>

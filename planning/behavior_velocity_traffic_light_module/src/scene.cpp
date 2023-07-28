@@ -165,13 +165,14 @@ TrafficLightModule::TrafficLightModule(
   const int64_t module_id, const int64_t lane_id,
   const lanelet::TrafficLight & traffic_light_reg_elem, lanelet::ConstLanelet lane,
   const PlannerParam & planner_param, const rclcpp::Logger logger,
-  const rclcpp::Clock::SharedPtr clock)
+  const rclcpp::Clock::SharedPtr clock, std::shared_ptr<DebugDataPublisher> debug_data_publisher)
 : SceneModuleInterface(module_id, logger, clock),
   lane_id_(lane_id),
   traffic_light_reg_elem_(traffic_light_reg_elem),
   lane_(lane),
   state_(State::APPROACH),
-  is_prev_state_stop_(false)
+  is_prev_state_stop_(false),
+  debug_data_publisher_(debug_data_publisher)
 {
   velocity_factor_.init(VelocityFactor::TRAFFIC_SIGNAL);
   planner_param_ = planner_param;
@@ -301,6 +302,23 @@ bool TrafficLightModule::isPassthrough(const double & signed_arc_length) const
   const bool reachable = signed_arc_length < reachable_distance;
 
   const auto & enable_pass_judge = planner_param_.enable_pass_judge;
+
+  RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "signed_arc_length: " << signed_arc_length);
+  RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "reachable_distance: " << reachable_distance);
+  RCLCPP_WARN_STREAM(
+    rclcpp::get_logger("debug"), "pass_judge_line_distance: " << pass_judge_line_distance);
+
+  {
+    auto get_debug_value = [&](const float value) {
+      tier4_debug_msgs::msg::Float32Stamped debug_value;
+      debug_value.stamp = clock_->now();
+      debug_value.data = value;
+      return debug_value;
+    };
+    debug_data_publisher_->pub_dist_to_stop_line_->publish(get_debug_value(signed_arc_length));
+    debug_data_publisher_->pub_reachable_dist_->publish(get_debug_value(reachable_distance));
+    debug_data_publisher_->pub_pass_judge_dist_->publish(get_debug_value(pass_judge_line_distance));
+  }
 
   if (enable_pass_judge && !stoppable && !is_prev_state_stop_) {
     // Cannot stop under acceleration and jerk limits.

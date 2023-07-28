@@ -37,6 +37,7 @@ TrafficLightModuleManager::TrafficLightModuleManager(rclcpp::Node & node)
   planner_param_.yellow_lamp_period = node.declare_parameter<double>(ns + ".yellow_lamp_period");
   pub_tl_state_ = node.create_publisher<autoware_perception_msgs::msg::TrafficSignal>(
     "~/output/traffic_signal", 1);
+  debug_data_publisher_ = std::make_shared<DebugDataPublisher>(node);
 }
 
 void TrafficLightModuleManager::modifyPathVelocity(
@@ -124,7 +125,8 @@ void TrafficLightModuleManager::launchNewModules(
     if (!isModuleRegisteredFromExistingAssociatedModule(module_id)) {
       registerModule(std::make_shared<TrafficLightModule>(
         module_id, lane_id, *(traffic_light_reg_elem.first), traffic_light_reg_elem.second,
-        planner_param_, logger_.get_child("traffic_light_module"), clock_));
+        planner_param_, logger_.get_child("traffic_light_module"), clock_,
+        debug_data_publisher_));
       generateUUID(module_id);
       updateRTCStatus(
         getUUID(module_id), true, std::numeric_limits<double>::lowest(), path.header.stamp);

@@ -410,6 +410,29 @@ protected:
   }
 };
 
+class DebugDataPublisher
+{
+public:
+  using Float32Stamped = tier4_debug_msgs::msg::Float32Stamped;
+
+  explicit DebugDataPublisher(rclcpp::Node & node) : node_(node)
+  {
+    pub_dist_to_stop_line_ =
+      node.create_publisher<Float32Stamped>("~/debug/traffic_light/dist_to_stop_line", 1);
+    pub_reachable_dist_ =
+      node.create_publisher<Float32Stamped>("~/debug/traffic_light/reachable_dist", 1);
+    pub_pass_judge_dist_ =
+      node.create_publisher<Float32Stamped>("~/debug/traffic_light/pass_judge_dist", 1);
+  }
+
+  rclcpp::Publisher<Float32Stamped>::SharedPtr pub_dist_to_stop_line_;
+  rclcpp::Publisher<Float32Stamped>::SharedPtr pub_reachable_dist_;
+  rclcpp::Publisher<Float32Stamped>::SharedPtr pub_pass_judge_dist_;
+
+private:
+  rclcpp::Node & node_;
+};
+
 }  // namespace behavior_velocity_planner
 
 #endif  // BEHAVIOR_VELOCITY_PLANNER_COMMON__SCENE_MODULE_INTERFACE_HPP_
