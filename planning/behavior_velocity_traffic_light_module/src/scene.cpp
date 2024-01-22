@@ -225,9 +225,9 @@ bool TrafficLightModule::modifyPathVelocity(PathWithLaneId * path, StopReason * 
 
     first_ref_stop_path_point_index_ = stop_line_point_idx;
 
-    // Check if stop is coming.
-    setSafe(!isStopSignal());
+    const bool is_stop_signal = isStopSignal();
 
+    // If the remaining time to red signal is available, judge the state from it
     const auto rest_time_to_red_signal =
       planner_data_->getRestTimeToRedSignal(traffic_light_reg_elem_.id());
     if (
@@ -239,16 +239,21 @@ bool TrafficLightModule::modifyPathVelocity(PathWithLaneId * path, StopReason * 
       const double ego_v = planner_data_->current_velocity->twist.linear.x;
       if (ego_v >= planner_param_.v2i_velocity_threshold) {
         if (ego_v * rest_time_allowed_to_go_ahead <= signed_arc_length_to_stop_point) {
-          *path = insertStopPose(input_path, stop_line_point_idx, stop_line_point, stop_reason);
+          setSafe(false);
         }
       } else {
         if (rest_time_allowed_to_go_ahead < planner_param_.v2i_required_time_to_departure) {
-          *path = insertStopPose(input_path, stop_line_point_idx, stop_line_point, stop_reason);
+          setSafe(false);
         }
       }
-      return true;
+
+      setSafe(true);
+    } else {
+      // Check if the looking traffic signal is GREEN
+      setSafe(!is_stop_signal);
     }
 
+    // Proceed if it is safe or RTC is activated
     if (isActivated()) {
       is_prev_state_stop_ = false;
       return true;
