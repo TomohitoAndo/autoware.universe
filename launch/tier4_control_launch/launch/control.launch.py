@@ -25,6 +25,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.actions import LoadComposableNodes
 from launch_ros.actions import PushRosNamespace
+from launch_ros.actions import Node
 from launch_ros.descriptions import ComposableNode
 from launch_ros.substitutions import FindPackageShare
 import yaml
@@ -64,11 +65,43 @@ def launch_setup(context, *args, **kwargs):
     with open(LaunchConfiguration("aeb_param_path").perform(context), "r") as f:
         aeb_param = yaml.safe_load(f)["/**"]["ros__parameters"]
 
-    controller_component = ComposableNode(
+    # controller_component = ComposableNode(
+    #     package="trajectory_follower_node",
+    #     plugin="autoware::motion::control::trajectory_follower_node::Controller",
+    #     name="controller_node_exe",
+    #     namespace="trajectory_follower",
+    #     remappings=[
+    #         ("~/input/reference_trajectory", "/planning/scenario_planning/trajectory"),
+    #         ("~/input/current_odometry", "/localization/kinematic_state"),
+    #         ("~/input/current_steering", "/vehicle/status/steering_status"),
+    #         ("~/input/current_accel", "/localization/acceleration"),
+    #         ("~/input/current_operation_mode", "/system/operation_mode/state"),
+    #         ("~/output/predicted_trajectory", "lateral/predicted_trajectory"),
+    #         ("~/output/lateral_diagnostic", "lateral/diagnostic"),
+    #         ("~/output/slope_angle", "longitudinal/slope_angle"),
+    #         ("~/output/longitudinal_diagnostic", "longitudinal/diagnostic"),
+    #         ("~/output/control_cmd", "control_cmd"),
+    #     ],
+    #     parameters=[
+    #         {
+    #             "lateral_controller_mode": LaunchConfiguration("lateral_controller_mode"),
+    #             "longitudinal_controller_mode": LaunchConfiguration("longitudinal_controller_mode"),
+    #         },
+    #         nearest_search_param,
+    #         trajectory_follower_node_param,
+    #         lon_controller_param,
+    #         lat_controller_param,
+    #         vehicle_info_param,
+    #     ],
+    #     extra_arguments=[{"use_intra_process_comms": LaunchConfiguration("use_intra_process")}],
+    # )
+
+    controller_node = Node(
         package="trajectory_follower_node",
-        plugin="autoware::motion::control::trajectory_follower_node::Controller",
+        executable="controller_node_exe",
         name="controller_node_exe",
         namespace="trajectory_follower",
+        output="both",
         remappings=[
             ("~/input/reference_trajectory", "/planning/scenario_planning/trajectory"),
             ("~/input/current_odometry", "/localization/kinematic_state"),
@@ -92,7 +125,6 @@ def launch_setup(context, *args, **kwargs):
             lat_controller_param,
             vehicle_info_param,
         ],
-        extra_arguments=[{"use_intra_process_comms": LaunchConfiguration("use_intra_process")}],
     )
 
     # lane departure checker
@@ -319,7 +351,7 @@ def launch_setup(context, *args, **kwargs):
         package="rclcpp_components",
         executable=LaunchConfiguration("container_executable"),
         composable_node_descriptions=[
-            controller_component,
+            # controller_component,
             control_validator_component,
             lane_departure_component,
             shift_decider_component,
@@ -327,6 +359,7 @@ def launch_setup(context, *args, **kwargs):
             operation_mode_transition_manager_component,
             glog_component,
         ],
+        # emulate_tty=True,  # TTYエミュレーションを有効化
     )
 
     group = GroupAction(
@@ -337,6 +370,7 @@ def launch_setup(context, *args, **kwargs):
             external_cmd_converter_loader,
             obstacle_collision_checker_loader,
             autonomous_emergency_braking_loader,
+            controller_node,
         ]
     )
 
