@@ -21,6 +21,7 @@ namespace autoware::motion::control::mpc_lateral_controller
 {
 QPSolverOSQP::QPSolverOSQP(const rclcpp::Logger & logger) : logger_{logger}
 {
+  osqpsolver_.updateVerbose(true);
 }
 bool QPSolverOSQP::solve(
   const Eigen::MatrixXd & h_mat, const Eigen::MatrixXd & f_vec, const Eigen::MatrixXd & a,

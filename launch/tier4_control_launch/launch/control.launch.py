@@ -318,6 +318,7 @@ def launch_setup(context, *args, **kwargs):
         namespace="",
         package="rclcpp_components",
         executable=LaunchConfiguration("container_executable"),
+        output="both",
         composable_node_descriptions=[
             controller_component,
             control_validator_component,
