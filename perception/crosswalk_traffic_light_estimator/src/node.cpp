@@ -148,6 +148,8 @@ void CrosswalkTrafficLightEstimatorNode::onRoute(const LaneletRoute::ConstShared
       conflicting_crosswalks_.push_back(lanelet);
     }
   }
+
+  RCLCPP_INFO(get_logger(), "[CrosswalkTrafficLightEstimatorNode]: Route is loaded");
 }
 
 void CrosswalkTrafficLightEstimatorNode::onTrafficLightArray(
