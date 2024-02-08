@@ -47,6 +47,7 @@ private:
   void arbitrateAndPublish(const builtin_interfaces::msg::Time & stamp);
 
   std::unique_ptr<std::unordered_set<lanelet::Id>> map_regulatory_elements_set_;
+  std::unique_ptr<std::unordered_set<lanelet::Id>> map_pedestrian_signal_regulatory_elements_set_;
 
   double external_time_tolerance_;
   double perception_time_tolerance_;
