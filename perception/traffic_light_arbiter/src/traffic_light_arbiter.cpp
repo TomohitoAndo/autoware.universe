@@ -298,31 +298,28 @@ void TrafficLightArbiter::arbitrateAndPublish(const builtin_interfaces::msg::Tim
     // Compare the signal element for each received signal id
     const auto received_signal_id_set =
       util::create_signal_id_set(perception_signals.signals, external_signals.signals);
-    for (const auto & signal_id : received_signal_id_set) {
-      // Check if the signal element exists
-      const auto perception_result = std::find_if(
-        perception_signals.signals.begin(), perception_signals.signals.end(),
-        [&signal_id](const TrafficSignal & signal) {
-          return signal.traffic_signal_id == signal_id;
-        });
 
-      const auto external_result = std::find_if(
-        external_signals.signals.begin(), external_signals.signals.end(),
-        [&signal_id](const TrafficSignal & signal) {
-          return signal.traffic_signal_id == signal_id;
-        });
+    for (const auto & signal_id : received_signal_id_set) {
+      const auto find_signal_by_id = [&signal_id](const TrafficSignalArray & signals) {
+        return std::find_if(
+          signals.signals.begin(), signals.signals.end(),
+          [&signal_id](const TrafficSignal & signal) {
+            return signal.traffic_signal_id == signal_id;
+          });
+      };
+
+      const auto perception_result = find_signal_by_id(perception_signals);
+      const auto external_result = find_signal_by_id(external_signals);
 
       auto & elements_and_priority = regulatory_element_signals_map[signal_id];
       const bool perception_result_exists = perception_result != perception_signals.signals.end();
       const bool external_result_exists = external_result != external_signals.signals.end();
 
       // Ignore pedestrian lights
-      const bool is_pedestrian_light =
+      if (
         map_pedestrian_signal_regulatory_elements_set_->find(signal_id) !=
-        map_pedestrian_signal_regulatory_elements_set_->end();
-      if (is_pedestrian_light) {
-        RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "pedestrian light: " << signal_id);
-        // TODO: think better way
+        map_pedestrian_signal_regulatory_elements_set_->end()) {
+        RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "Ignoring pedestrian light: " << signal_id);
         if (perception_result_exists) {
           add_signal_function(*perception_result, false);
         }
@@ -332,26 +329,25 @@ void TrafficLightArbiter::arbitrateAndPublish(const builtin_interfaces::msg::Tim
         continue;
       }
 
-      // If either of the signal is not received, treat as unknown signal
-      if (!perception_result_exists || !external_result_exists) {
-        // Insert unknown signal
+      auto insert_unknown_elements = [&](const auto & result) {
         std::vector<Element> unknown_elements;
-        if (perception_result_exists) {
-          for (const auto & element : perception_result->elements) {
-            unknown_elements.emplace_back(
-              util::create_element(Element::UNKNOWN, element.shape, Element::SOLID_ON, 1.0));
-          }
-        } else if (external_result_exists) {
-          for (const auto & element : external_result->elements) {
-            unknown_elements.emplace_back(
-              util::create_element(Element::UNKNOWN, element.shape, Element::SOLID_ON, 1.0));
-          }
+        for (const auto & element : result->elements) {
+          unknown_elements.emplace_back(
+            util::create_element(Element::UNKNOWN, element.shape, Element::SOLID_ON, 1.0));
         }
-
         std::transform(
           unknown_elements.begin(), unknown_elements.end(),
           std::back_inserter(elements_and_priority),
           [](const auto & elem) { return std::make_pair(elem, false); });
+      };
+
+      // If either of the signal is not received, treat as unknown signal
+      if (!perception_result_exists || !external_result_exists) {
+        if (perception_result_exists) {
+          insert_unknown_elements(perception_result);
+        } else if (external_result_exists) {
+          insert_unknown_elements(external_result);
+        }
         continue;
       }
 
@@ -361,18 +357,15 @@ void TrafficLightArbiter::arbitrateAndPublish(const builtin_interfaces::msg::Tim
         // Insert unknown signal if not same
         const auto unknown_elements =
           util::create_unknown_elements(perception_result->elements, external_result->elements);
-
         std::transform(
           unknown_elements.begin(), unknown_elements.end(),
           std::back_inserter(elements_and_priority),
           [](const auto & elem) { return std::make_pair(elem, false); });
-        continue;
-      }
-
-      // Both results are same, so insert the received color
-      // Since they are same, either one can be used
-      for (const auto & element : perception_result->elements) {
-        elements_and_priority.emplace_back(element, false);
+      } else {
+        // Both results are same, so insert the received color
+        for (const auto & element : perception_result->elements) {
+          elements_and_priority.emplace_back(element, false);
+        }
       }
     }
   };
