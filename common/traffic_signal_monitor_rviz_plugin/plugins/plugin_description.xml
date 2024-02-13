@@ -1,0 +1,9 @@
+<library path="traffic_light_monitor_rviz_plugin">
+
+  <class
+    type="rviz_plugins::TrafficLightMonitorPanel"
+    base_class_type="rviz_common::Panel">
+    <description>TrafficLightMonitorPanel</description>
+  </class>
+
+</library>

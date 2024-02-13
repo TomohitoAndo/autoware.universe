@@ -43,18 +43,19 @@ std::vector<TrafficLightConstPtr> filter_traffic_signals(const LaneletMapConstPt
     }
   }
 
-  namespace query = lanelet::utils::query;
-  lanelet::ConstLanelets all_lanelets = query::laneletLayer(map);
-  std::vector<TrafficLightConstPtr> all_lanelet_traffic_lights = query::trafficLights(all_lanelets);
+  // namespace query = lanelet::utils::query;
+  // lanelet::ConstLanelets all_lanelets = query::laneletLayer(map);
+  // std::vector<TrafficLightConstPtr> all_lanelet_traffic_lights =
+  // query::trafficLights(all_lanelets);
 
-  for (const auto & light_reg_elem : all_lanelet_traffic_lights) {
-    const auto light_id = light_reg_elem->trafficLights().front().id();
-    RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), light_reg_elem->id());
-    const auto traffic_light_line_string = map->lineStringLayer.get(light_id);
-    const auto subtype =
-      traffic_light_line_string.attributeOr(lanelet::AttributeName::Subtype, "none");
-    RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "subtype: " << subtype);
-  }
+  // for (const auto & light_reg_elem : all_lanelet_traffic_lights) {
+  //   const auto light_id = light_reg_elem->trafficLights().front().id();
+  //   RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), light_reg_elem->id());
+  //   const auto traffic_light_line_string = map->lineStringLayer.get(light_id);
+  //   const auto subtype =
+  //     traffic_light_line_string.attributeOr(lanelet::AttributeName::Subtype, "none");
+  //   RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "subtype: " << subtype);
+  // }
 
   // RCLCPP_WARN_STREAM(
   //   rclcpp::get_logger("debug"), "--------------- lanelet traffic light ---------------");
@@ -166,9 +167,7 @@ bool are_all_elements_equivalent(
   // Compare the sorted vectors and return true if they have all the same elements
   return std::equal(
     sorted_signal1.begin(), sorted_signal1.end(), sorted_signal2.begin(), sorted_signal2.end(),
-    [](const Element & a, const Element & b) {
-      return a.color == b.color && a.shape == b.shape && a.status == b.status;
-    });
+    [](const Element & a, const Element & b) { return a.color == b.color && a.shape == b.shape; });
 }
 
 std::unordered_set<lanelet::Id> create_signal_id_set(
@@ -307,7 +306,6 @@ void TrafficLightArbiter::arbitrateAndPublish(const builtin_interfaces::msg::Tim
             return signal.traffic_signal_id == signal_id;
           });
       };
-
       const auto perception_result = find_signal_by_id(perception_signals);
       const auto external_result = find_signal_by_id(external_signals);
 
@@ -319,13 +317,15 @@ void TrafficLightArbiter::arbitrateAndPublish(const builtin_interfaces::msg::Tim
       if (
         map_pedestrian_signal_regulatory_elements_set_->find(signal_id) !=
         map_pedestrian_signal_regulatory_elements_set_->end()) {
-        RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "Ignoring pedestrian light: " << signal_id);
+        // TODO: Think better way
+        // change add_signal_function to normal function and use it?
         if (perception_result_exists) {
           add_signal_function(*perception_result, false);
         }
         if (external_result_exists) {
           add_signal_function(*external_result, true);
         }
+
         continue;
       }
 
@@ -343,6 +343,9 @@ void TrafficLightArbiter::arbitrateAndPublish(const builtin_interfaces::msg::Tim
 
       // If either of the signal is not received, treat as unknown signal
       if (!perception_result_exists || !external_result_exists) {
+        // RCLCPP_WARN_STREAM(
+        //   rclcpp::get_logger("debug"),
+        //   "Either of perception result or external result doesn't exist");
         if (perception_result_exists) {
           insert_unknown_elements(perception_result);
         } else if (external_result_exists) {
@@ -354,6 +357,8 @@ void TrafficLightArbiter::arbitrateAndPublish(const builtin_interfaces::msg::Tim
       // Check if they have the same elements
       if (!util::are_all_elements_equivalent(
             perception_result->elements, external_result->elements)) {
+        // RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "Not the same signal");
+
         // Insert unknown signal if not same
         const auto unknown_elements =
           util::create_unknown_elements(perception_result->elements, external_result->elements);
@@ -361,11 +366,13 @@ void TrafficLightArbiter::arbitrateAndPublish(const builtin_interfaces::msg::Tim
           unknown_elements.begin(), unknown_elements.end(),
           std::back_inserter(elements_and_priority),
           [](const auto & elem) { return std::make_pair(elem, false); });
-      } else {
-        // Both results are same, so insert the received color
-        for (const auto & element : perception_result->elements) {
-          elements_and_priority.emplace_back(element, false);
-        }
+        continue;
+      }
+
+      // Both results are same, so insert the received color
+      // RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "Both results are same");
+      for (const auto & element : perception_result->elements) {
+        elements_and_priority.emplace_back(element, false);
       }
     }
   };

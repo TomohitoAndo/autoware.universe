@@ -1,7 +1,7 @@
 <launch>
-  <arg name="perception_traffic_signals" default="/internal/traffic_signals"/>
-  <arg name="external_traffic_signals" default="/external/traffic_signals"/>
-  <arg name="output_traffic_signals" default="/traffic_light_arbiter/traffic_signals"/>
+  <arg name="perception_traffic_signals" default="/perception/traffic_light_recognition/internal/traffic_signals"/>
+  <arg name="external_traffic_signals" default="/v2x/traffic_signals"/>
+  <arg name="output_traffic_signals" default="/perception/traffic_light_recognition/traffic_signals"/>
   <arg name="traffic_light_arbiter_param_path" default="$(find-pkg-share traffic_light_arbiter)/config/traffic_light_arbiter.param.yaml"/>
 
   <push-ros-namespace namespace="traffic_light_arbiter"/>
