@@ -31,7 +31,6 @@ namespace lanelet
 {
 
 using TrafficLightConstPtr = std::shared_ptr<const TrafficLight>;
-using TrafficLightConstPtr = lanelet::TrafficLightConstPtr;
 
 std::vector<TrafficLightConstPtr> filter_traffic_signals(const LaneletMapConstPtr map)
 {
@@ -73,8 +72,12 @@ TrafficLightArbiter::TrafficLightArbiter(const rclcpp::NodeOptions & options)
   external_time_tolerance_ = this->declare_parameter<double>("external_time_tolerance", 5.0);
   perception_time_tolerance_ = this->declare_parameter<double>("perception_time_tolerance", 1.0);
   external_priority_ = this->declare_parameter<bool>("external_priority", false);
+  enable_signal_matching_ = this->declare_parameter<bool>("enable_signal_matching", false);
 
-  signal_match_validator_.setExternalPriority(external_priority_);
+  if (enable_signal_matching_) {
+    signal_match_validator_ = std::make_unique<SignalMatchValidator>();
+    signal_match_validator_->setExternalPriority(external_priority_);
+  }
 
   map_sub_ = create_subscription<LaneletMapBin>(
     "~/sub/vector_map", rclcpp::QoS(1).transient_local(),
@@ -103,9 +106,11 @@ void TrafficLightArbiter::onMap(const LaneletMapBin::ConstSharedPtr msg)
     map_regulatory_elements_set_->emplace(signal->id());
   }
 
-  // Filter only pedestrian signals to distinguish them in compare function
-  const auto pedestrian_signals = lanelet::filter_pedestrian_signals(map);
-  signal_match_validator_.setPedestrianSignals(pedestrian_signals);
+  if (enable_signal_matching_) {
+    // Filter only pedestrian signals to distinguish them in compare function
+    const auto pedestrian_signals = lanelet::filter_pedestrian_signals(map);
+    signal_match_validator_->setPedestrianSignals(pedestrian_signals);
+  }
 }
 
 void TrafficLightArbiter::onPerceptionMsg(const TrafficSignalArray::ConstSharedPtr msg)
@@ -168,11 +173,9 @@ void TrafficLightArbiter::arbitrateAndPublish(const builtin_interfaces::msg::Tim
     }
   };
 
-  // TODO: parameter
-  const bool validate_perception_and_external = true;
-  if (validate_perception_and_external) {
+  if (enable_signal_matching_) {
     const auto validated_signals =
-      signal_match_validator_.validateSignals(latest_perception_msg_, latest_external_msg_);
+      signal_match_validator_->validateSignals(latest_perception_msg_, latest_external_msg_);
     for (const auto & signal : validated_signals.signals) {
       add_signal_function(signal, false);
     }

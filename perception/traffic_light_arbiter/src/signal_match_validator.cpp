@@ -21,7 +21,7 @@ using TrafficSignal = autoware_perception_msgs::msg::TrafficSignal;
 using Element = autoware_perception_msgs::msg::TrafficSignalElement;
 using Time = builtin_interfaces::msg::Time;
 
-// Finds a signal by its ID within a TrafficSignalArray.
+// Finds a signal by its ID within a TrafficSignalArray
 std::optional<TrafficSignal> find_signal_by_id(
   const TrafficSignalArray & signals, int64_t signal_id)
 {
@@ -29,13 +29,13 @@ std::optional<TrafficSignal> find_signal_by_id(
     signals.signals.begin(), signals.signals.end(),
     [signal_id](const TrafficSignal & signal) { return signal.traffic_signal_id == signal_id; });
   if (it != signals.signals.end()) {
-    return *it;  // Return the found signal.
+    return *it;  // Return the found signal
   } else {
-    return std::nullopt;  // Return an empty optional if not found.
+    return std::nullopt;  // Return an empty optional if not found
   }
 }
 
-// Creates a TrafficSignalElement with specified attributes.
+// Creates a TrafficSignalElement with specified attributes
 Element create_element(
   const Element::_color_type & color, const Element::_shape_type & shape,
   const Element::_status_type & status, const Element::_confidence_type & confidence)
@@ -49,7 +49,7 @@ Element create_element(
   return signal_element;
 }
 
-// Creates unknown elements for each unique shape from two element vectors.
+// Creates unknown elements for each unique shape from two element vectors
 std::vector<Element> create_unknown_elements(
   const std::vector<Element> & elements1, const std::vector<Element> & elements2)
 {
@@ -63,7 +63,7 @@ std::vector<Element> create_unknown_elements(
 
   std::vector<Element> unknown_elements;
   for (const auto & shape : shape_set) {
-    // Confidence is set to a default value as it is not relevant for unknown signals.
+    // Confidence is set to a default value as it is not relevant for unknown signals
     unknown_elements.emplace_back(
       create_element(Element::UNKNOWN, shape, Element::UNKNOWN, /* confidence */ 1.0));
   }
@@ -71,13 +71,13 @@ std::vector<Element> create_unknown_elements(
   return unknown_elements;
 }
 
-// Creates a 'unknown' signal with elements matching the shapes of a given signal's elements.
+// Creates a 'unknown' signal with elements matching the shapes of a given signal's elements
 TrafficSignal create_unknown_signal(const TrafficSignal & signal)
 {
   TrafficSignal unknown_signal;
   unknown_signal.traffic_signal_id = signal.traffic_signal_id;
   for (const auto & element : signal.elements) {
-    // Confidence is set to a default value as it is not relevant for unknown signals.
+    // Confidence is set to a default value as it is not relevant for unknown signals
     const auto unknown_element =
       create_element(Element::UNKNOWN, element.shape, Element::UNKNOWN, /* confidence */ 1.0);
     unknown_signal.elements.emplace_back(unknown_element);
@@ -86,12 +86,12 @@ TrafficSignal create_unknown_signal(const TrafficSignal & signal)
   return unknown_signal;
 }
 
-// Creates an 'unknown' signal by combining unique shapes from two signals' elements.
+// Creates an 'unknown' signal by combining unique shapes from two signals' elements
 TrafficSignal create_unknown_signal(const TrafficSignal & signal1, const TrafficSignal & signal2)
 {
   TrafficSignal unknown_signal;
 
-  // Assumes that both signals have the same traffic_signal_id.
+  // Assumes that both signals have the same traffic_signal_id
   unknown_signal.traffic_signal_id = signal1.traffic_signal_id;
 
   const auto unknown_elements = create_unknown_elements(signal1.elements, signal2.elements);
@@ -106,25 +106,25 @@ TrafficSignal create_unknown_signal(const TrafficSignal & signal1, const Traffic
 bool are_all_elements_equivalent(
   const std::vector<Element> & signal1, const std::vector<Element> & signal2)
 {
-  // Returns false if vectors have different sizes.
+  // Returns false if vectors have different sizes
   if (signal1.size() != signal2.size()) {
     return false;
   }
 
-  // Sorts copies of the vectors by shape for comparison.
+  // Sorts copies of the vectors by shape for comparison
   std::vector<Element> sorted_signal1 = signal1;
   std::vector<Element> sorted_signal2 = signal2;
   auto compare_by_shape = [](const Element & a, const Element & b) { return a.shape < b.shape; };
   std::sort(sorted_signal1.begin(), sorted_signal1.end(), compare_by_shape);
   std::sort(sorted_signal2.begin(), sorted_signal2.end(), compare_by_shape);
 
-  // Returns true if sorted vectors are equal.
+  // Returns true if sorted vectors are equal
   return std::equal(
     sorted_signal1.begin(), sorted_signal1.end(), sorted_signal2.begin(), sorted_signal2.end(),
     [](const Element & a, const Element & b) { return a.color == b.color && a.shape == b.shape; });
 }
 
-// Creates a set of unique signal IDs from two vectors of TrafficSignals.
+// Creates a set of unique signal IDs from two vectors of TrafficSignals
 std::unordered_set<lanelet::Id> create_signal_id_set(
   const std::vector<TrafficSignal> & signals1, const std::vector<TrafficSignal> & signals2)
 {
@@ -139,12 +139,12 @@ std::unordered_set<lanelet::Id> create_signal_id_set(
   return signal_id_set;
 }
 
-// Returns the signal with the highest confidence elements, considering a external priority.
+// Returns the signal with the highest confidence elements, considering a external priority
 TrafficSignal get_highest_confidence_signal(
   const std::optional<TrafficSignal> & perception_signal,
   const std::optional<TrafficSignal> & external_signal, const bool external_priority)
 {
-  // Returns the existing signal if only one of them exists.
+  // Returns the existing signal if only one of them exists
   if (!perception_signal) {
     return *external_signal;
   }
@@ -152,12 +152,12 @@ TrafficSignal get_highest_confidence_signal(
     return *perception_signal;
   }
 
-  // Gives priority to the external signal if external_priority is true.
+  // Gives priority to the external signal if external_priority is true
   if (external_priority) {
     return *external_signal;
   }
 
-  // Compiles elements into a map by shape, to compare their confidences.
+  // Compiles elements into a map by shape, to compare their confidences
   using Key = Element::_shape_type;
   std::map<Key, std::vector<Element>> shape_element_map;
   for (const auto & element : perception_signal->elements) {
@@ -169,10 +169,10 @@ TrafficSignal get_highest_confidence_signal(
 
   TrafficSignal highest_confidence_signal;
 
-  // Assumes that both signals have the same traffic_signal_id.
+  // Assumes that both signals have the same traffic_signal_id
   highest_confidence_signal.traffic_signal_id = perception_signal->traffic_signal_id;
 
-  // For each shape, finds the element with the highest confidence and adds it to the signal.
+  // For each shape, finds the element with the highest confidence and adds it to the signal
   for (const auto & [shape, elements] : shape_element_map) {
     const auto highest_confidence_element = std::max_element(
       elements.begin(), elements.end(),
@@ -183,10 +183,10 @@ TrafficSignal get_highest_confidence_signal(
   return highest_confidence_signal;
 }
 
-// Determines the newer of two Time stamps.
+// Determines the newer of two Time stamps
 Time get_newer_stamp(const Time & stamp1, const Time & stamp2)
 {
-  // Returns stamp1 if it is newer than stamp2, otherwise returns stamp2.
+  // Returns stamp1 if it is newer than stamp2, otherwise returns stamp2
   if (stamp1.sec > stamp2.sec || (stamp1.sec == stamp2.sec && stamp1.nanosec > stamp2.nanosec)) {
     return stamp1;
   } else {
@@ -242,15 +242,12 @@ autoware_perception_msgs::msg::TrafficSignalArray SignalMatchValidator::validate
     // Check if they have the same elements
     if (!util::are_all_elements_equivalent(
           perception_result->elements, external_result->elements)) {
-      // RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "Not the same signal");
-
       const auto unknown_signal = util::create_unknown_signal(*perception_result, *external_result);
       validated_signals.signals.emplace_back(unknown_signal);
       continue;
     }
 
     // Both results are same, then insert the received color
-    // RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "Both results are same");
     validated_signals.signals.emplace_back(*perception_result);
   }
 

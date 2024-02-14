@@ -53,11 +53,12 @@ private:
   double external_time_tolerance_;
   double perception_time_tolerance_;
   bool external_priority_;
+  bool enable_signal_matching_;
 
   TrafficSignalArray latest_perception_msg_;
   TrafficSignalArray latest_external_msg_;
 
-  SignalMatchValidator signal_match_validator_;
+  std::unique_ptr<SignalMatchValidator> signal_match_validator_;
 };
 
 #endif  // TRAFFIC_LIGHT_ARBITER__TRAFFIC_LIGHT_ARBITER_HPP_
