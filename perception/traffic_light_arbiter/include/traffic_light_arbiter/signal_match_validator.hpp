@@ -63,15 +63,41 @@ public:
   TrafficSignalArray validateSignals(
     const TrafficSignalArray & perception_signals, const TrafficSignalArray & external_signals);
 
+  /**
+   * @brief Sets the pedestrian signals to be considered during validation.
+   *
+   * This method allows the specification of pedestrian signals, which are then
+   * used to adjust the validation logic, acknowledging their unique characteristics
+   * in traffic signal datasets.
+   *
+   * @param pedestrian_signals A vector of pedestrian signal pointers.
+   */
   void setPedestrianSignals(const std::vector<TrafficLightConstPtr> & pedestrian_signals);
 
+  /**
+   * @brief Sets the priority flag for using external signal data over perception data.
+   *
+   * When set to true, this flag indicates that in cases of discrepancy between
+   * perception and external signal data, the external data should be prioritized.
+   *
+   * @param external_priority The priority flag for external signal data.
+   */
   void setExternalPriority(const bool external_priority);
-
-  bool isPedestrianSignal(const lanelet::Id & signal_id);
 
 private:
   bool external_priority_;
   std::unordered_set<lanelet::Id> map_pedestrian_signal_regulatory_elements_set_;
+
+  /**
+   * @brief Checks if a given signal ID corresponds to a pedestrian signal.
+   *
+   * This method determines whether a signal, identified by its ID, is classified
+   * as a pedestrian signal.
+   *
+   * @param signal_id The ID of the signal to check.
+   * @return True if the signal is a pedestrian signal, false otherwise.
+   */
+  bool isPedestrianSignal(const lanelet::Id & signal_id);
 };
 
 #endif
