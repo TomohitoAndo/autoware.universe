@@ -16,6 +16,7 @@
 #define TRAFFIC_LIGHT_ARBITER__TRAFFIC_LIGHT_ARBITER_HPP_
 
 #include <rclcpp/rclcpp.hpp>
+#include <traffic_light_arbiter/signal_match_validator.hpp>
 
 #include <autoware_auto_mapping_msgs/msg/had_map_bin.hpp>
 #include <autoware_perception_msgs/msg/traffic_signal_array.hpp>
@@ -55,6 +56,8 @@ private:
 
   TrafficSignalArray latest_perception_msg_;
   TrafficSignalArray latest_external_msg_;
+
+  SignalMatchValidator signal_match_validator_;
 };
 
 #endif  // TRAFFIC_LIGHT_ARBITER__TRAFFIC_LIGHT_ARBITER_HPP_

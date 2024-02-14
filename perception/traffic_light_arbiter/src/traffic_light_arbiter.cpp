@@ -43,49 +43,8 @@ std::vector<TrafficLightConstPtr> filter_traffic_signals(const LaneletMapConstPt
     }
   }
 
-  // namespace query = lanelet::utils::query;
-  // lanelet::ConstLanelets all_lanelets = query::laneletLayer(map);
-  // std::vector<TrafficLightConstPtr> all_lanelet_traffic_lights =
-  // query::trafficLights(all_lanelets);
-
-  // for (const auto & light_reg_elem : all_lanelet_traffic_lights) {
-  //   const auto light_id = light_reg_elem->trafficLights().front().id();
-  //   RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), light_reg_elem->id());
-  //   const auto traffic_light_line_string = map->lineStringLayer.get(light_id);
-  //   const auto subtype =
-  //     traffic_light_line_string.attributeOr(lanelet::AttributeName::Subtype, "none");
-  //   RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "subtype: " << subtype);
-  // }
-
-  // RCLCPP_WARN_STREAM(
-  //   rclcpp::get_logger("debug"), "--------------- lanelet traffic light ---------------");
-
-  // std::vector<lanelet::TrafficLightConstPtr> all_traffic_lights =
-  //   query::trafficLights(all_lanelets);
-  // for (const auto & light : all_traffic_lights) {
-  //   RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), light->id());
-  // }
-
   return signals;
 }
-
-// std::vector<TrafficLightConstPtr> filter_pedestrian_signals(const LaneletMapConstPtr map)
-// {
-//   namespace query = lanelet::utils::query;
-
-//   const auto all_lanelets = query::laneletLayer(map);
-//   const auto crosswalks = query::crosswalkLanelets(all_lanelets);
-//   std::vector<TrafficLightConstPtr> signals;
-//   for (const auto & crosswalk : crosswalks) {
-//     const auto traffic_light_reg_elems =
-//       crosswalk.regulatoryElementsAs<const lanelet::TrafficLight>();
-//     for (const auto & reg_elem : traffic_light_reg_elems) {
-//       signals.emplace_back(reg_elem);
-//     }
-//   }
-
-//   return signals;
-// }
 
 std::vector<TrafficLightConstPtr> filter_pedestrian_signals(const LaneletMapConstPtr map)
 {
@@ -108,90 +67,14 @@ std::vector<TrafficLightConstPtr> filter_pedestrian_signals(const LaneletMapCons
 
 }  // namespace lanelet
 
-namespace util
-{
-using Element = autoware_perception_msgs::msg::TrafficSignalElement;
-using TrafficSignal = autoware_perception_msgs::msg::TrafficSignal;
-
-Element create_element(
-  const Element::_color_type & color, const Element::_shape_type & shape,
-  const Element::_status_type & status, const Element::_confidence_type & confidence)
-{
-  Element signal_element;
-  signal_element.color = color;
-  signal_element.shape = shape;
-  signal_element.status = status;
-  signal_element.confidence = confidence;
-
-  return signal_element;
-}
-
-// Create unknown elements for each shape
-std::vector<Element> create_unknown_elements(
-  const std::vector<Element> & elements1, const std::vector<Element> & elements2)
-{
-  std::unordered_set<Element::_shape_type> shape_set;
-  for (const auto & element : elements1) {
-    shape_set.emplace(element.shape);
-  }
-  for (const auto & element : elements2) {
-    shape_set.emplace(element.shape);
-  }
-
-  std::vector<Element> unknown_elements;
-  for (const auto & shape : shape_set) {
-    unknown_elements.emplace_back(
-      util::create_element(Element::UNKNOWN, shape, Element::SOLID_ON, 1.0));
-  }
-
-  return unknown_elements;
-}
-
-bool are_all_elements_equivalent(
-  const std::vector<Element> & signal1, const std::vector<Element> & signal2)
-{
-  // Check if the vectors have the same size
-  if (signal1.size() != signal2.size()) {
-    return false;
-  }
-
-  // Create copies of the vectors
-  std::vector<Element> sorted_signal1 = signal1;
-  std::vector<Element> sorted_signal2 = signal2;
-
-  // Sort based on the shape to ensure that they are same order
-  auto compare_by_shape = [](const Element & a, const Element & b) { return a.shape < b.shape; };
-  std::sort(sorted_signal1.begin(), sorted_signal1.end(), compare_by_shape);
-  std::sort(sorted_signal2.begin(), sorted_signal2.end(), compare_by_shape);
-
-  // Compare the sorted vectors and return true if they have all the same elements
-  return std::equal(
-    sorted_signal1.begin(), sorted_signal1.end(), sorted_signal2.begin(), sorted_signal2.end(),
-    [](const Element & a, const Element & b) { return a.color == b.color && a.shape == b.shape; });
-}
-
-std::unordered_set<lanelet::Id> create_signal_id_set(
-  const std::vector<TrafficSignal> & signals1, const std::vector<TrafficSignal> & signals2)
-{
-  std::unordered_set<lanelet::Id> signal_id_set;
-  for (const auto & signal : signals1) {
-    signal_id_set.emplace(signal.traffic_signal_id);
-  }
-  for (const auto & signal : signals2) {
-    signal_id_set.emplace(signal.traffic_signal_id);
-  }
-
-  return signal_id_set;
-}
-
-}  // namespace util
-
 TrafficLightArbiter::TrafficLightArbiter(const rclcpp::NodeOptions & options)
 : Node("traffic_light_arbiter", options)
 {
   external_time_tolerance_ = this->declare_parameter<double>("external_time_tolerance", 5.0);
   perception_time_tolerance_ = this->declare_parameter<double>("perception_time_tolerance", 1.0);
   external_priority_ = this->declare_parameter<bool>("external_priority", false);
+
+  signal_match_validator_.setExternalPriority(external_priority_);
 
   map_sub_ = create_subscription<LaneletMapBin>(
     "~/sub/vector_map", rclcpp::QoS(1).transient_local(),
@@ -222,24 +105,18 @@ void TrafficLightArbiter::onMap(const LaneletMapBin::ConstSharedPtr msg)
 
   // Filter only pedestrian signals to distinguish them in compare function
   const auto pedestrian_signals = lanelet::filter_pedestrian_signals(map);
-  map_pedestrian_signal_regulatory_elements_set_ =
-    std::make_unique<std::unordered_set<lanelet::Id>>();
-
-  for (const auto & signal : pedestrian_signals) {
-    map_pedestrian_signal_regulatory_elements_set_->emplace(signal->id());
-  }
+  signal_match_validator_.setPedestrianSignals(pedestrian_signals);
 }
 
 void TrafficLightArbiter::onPerceptionMsg(const TrafficSignalArray::ConstSharedPtr msg)
 {
   latest_perception_msg_ = *msg;
 
-  // TODO: maybe this is not needed anymore
-  // if (
-  //   (rclcpp::Time(msg->stamp) - rclcpp::Time(latest_external_msg_.stamp)).seconds() >
-  //   external_time_tolerance_) {
-  //   latest_external_msg_.signals.clear();
-  // }
+  if (
+    (rclcpp::Time(msg->stamp) - rclcpp::Time(latest_external_msg_.stamp)).seconds() >
+    external_time_tolerance_) {
+    latest_external_msg_.signals.clear();
+  }
 
   arbitrateAndPublish(msg->stamp);
 }
@@ -248,11 +125,11 @@ void TrafficLightArbiter::onExternalMsg(const TrafficSignalArray::ConstSharedPtr
 {
   latest_external_msg_ = *msg;
 
-  // if (
-  //   (rclcpp::Time(msg->stamp) - rclcpp::Time(latest_perception_msg_.stamp)).seconds() >
-  //   perception_time_tolerance_) {
-  //   latest_perception_msg_.signals.clear();
-  // }
+  if (
+    (rclcpp::Time(msg->stamp) - rclcpp::Time(latest_perception_msg_.stamp)).seconds() >
+    perception_time_tolerance_) {
+    latest_perception_msg_.signals.clear();
+  }
 
   arbitrateAndPublish(msg->stamp);
 }
@@ -291,96 +168,14 @@ void TrafficLightArbiter::arbitrateAndPublish(const builtin_interfaces::msg::Tim
     }
   };
 
-  auto compare_and_add_signal_function = [&](
-                                           const TrafficSignalArray & perception_signals,
-                                           const TrafficSignalArray & external_signals) {
-    // Compare the signal element for each received signal id
-    const auto received_signal_id_set =
-      util::create_signal_id_set(perception_signals.signals, external_signals.signals);
-
-    for (const auto & signal_id : received_signal_id_set) {
-      const auto find_signal_by_id = [&signal_id](const TrafficSignalArray & signals) {
-        return std::find_if(
-          signals.signals.begin(), signals.signals.end(),
-          [&signal_id](const TrafficSignal & signal) {
-            return signal.traffic_signal_id == signal_id;
-          });
-      };
-      const auto perception_result = find_signal_by_id(perception_signals);
-      const auto external_result = find_signal_by_id(external_signals);
-
-      auto & elements_and_priority = regulatory_element_signals_map[signal_id];
-      const bool perception_result_exists = perception_result != perception_signals.signals.end();
-      const bool external_result_exists = external_result != external_signals.signals.end();
-
-      // Ignore pedestrian lights
-      if (
-        map_pedestrian_signal_regulatory_elements_set_->find(signal_id) !=
-        map_pedestrian_signal_regulatory_elements_set_->end()) {
-        // TODO: Think better way
-        // change add_signal_function to normal function and use it?
-        if (perception_result_exists) {
-          add_signal_function(*perception_result, false);
-        }
-        if (external_result_exists) {
-          add_signal_function(*external_result, true);
-        }
-
-        continue;
-      }
-
-      auto insert_unknown_elements = [&](const auto & result) {
-        std::vector<Element> unknown_elements;
-        for (const auto & element : result->elements) {
-          unknown_elements.emplace_back(
-            util::create_element(Element::UNKNOWN, element.shape, Element::SOLID_ON, 1.0));
-        }
-        std::transform(
-          unknown_elements.begin(), unknown_elements.end(),
-          std::back_inserter(elements_and_priority),
-          [](const auto & elem) { return std::make_pair(elem, false); });
-      };
-
-      // If either of the signal is not received, treat as unknown signal
-      if (!perception_result_exists || !external_result_exists) {
-        // RCLCPP_WARN_STREAM(
-        //   rclcpp::get_logger("debug"),
-        //   "Either of perception result or external result doesn't exist");
-        if (perception_result_exists) {
-          insert_unknown_elements(perception_result);
-        } else if (external_result_exists) {
-          insert_unknown_elements(external_result);
-        }
-        continue;
-      }
-
-      // Check if they have the same elements
-      if (!util::are_all_elements_equivalent(
-            perception_result->elements, external_result->elements)) {
-        // RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "Not the same signal");
-
-        // Insert unknown signal if not same
-        const auto unknown_elements =
-          util::create_unknown_elements(perception_result->elements, external_result->elements);
-        std::transform(
-          unknown_elements.begin(), unknown_elements.end(),
-          std::back_inserter(elements_and_priority),
-          [](const auto & elem) { return std::make_pair(elem, false); });
-        continue;
-      }
-
-      // Both results are same, so insert the received color
-      // RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "Both results are same");
-      for (const auto & element : perception_result->elements) {
-        elements_and_priority.emplace_back(element, false);
-      }
-    }
-  };
-
   // TODO: parameter
-  const bool compare_perception_and_external_result = true;
-  if (compare_perception_and_external_result) {
-    compare_and_add_signal_function(latest_perception_msg_, latest_external_msg_);
+  const bool validate_perception_and_external = true;
+  if (validate_perception_and_external) {
+    const auto validated_signals =
+      signal_match_validator_.validateSignals(latest_perception_msg_, latest_external_msg_);
+    for (const auto & signal : validated_signals.signals) {
+      add_signal_function(signal, false);
+    }
   } else {
     for (const auto & signal : latest_perception_msg_.signals) {
       add_signal_function(signal, false);
