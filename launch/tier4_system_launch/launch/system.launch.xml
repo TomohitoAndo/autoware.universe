@@ -2,6 +2,8 @@
 <launch>
   <!-- Parameter files -->
   <arg name="component_state_monitor_topic_path"/>
+  <arg name="diagnostic_graph_aggregator_param_path"/>
+  <arg name="diagnostic_graph_aggregator_graph_path"/>
   <arg name="emergency_handler_param_path"/>
   <arg name="duplicated_node_checker_param_path"/>
   <arg name="mrm_comfortable_stop_operator_param_path"/>
@@ -62,7 +64,7 @@
     </group>
 
     <!-- Error Monitor -->
-    <group>
+    <group if="false">
       <let name="config_file" value="$(var system_error_monitor_param_path)" if="$(eval &quot;'$(var run_mode)'=='online'&quot;)"/>
       <let name="config_file" value="$(var system_error_monitor_param_path)" if="$(eval &quot;'$(var run_mode)'=='logging_simulation'&quot;)"/>
       <let name="config_file" value="$(var system_error_monitor_planning_simulator_param_path)" if="$(eval &quot;'$(var run_mode)'=='planning_simulation'&quot;)"/>
@@ -73,6 +75,24 @@
         <arg name="extra_agg_config_file_vehicle" value="$(var diagnostic_aggregator_vehicle_param_path)"/>
         <arg name="use_emergency_hold" value="false"/>
       </include>
+    </group>
+
+    <!-- Diagnostic Graph Aggregator -->
+    <group>
+      <let name="graph_file" value="$(var diagnostic_graph_aggregator_graph_path)" if="$(eval &quot;'$(var run_mode)'=='online' or '$(var run_mode)'=='logging_simulation'&quot;)"/>
+      <let name="graph_file" value="$(var diagnostic_graph_aggregator_graph_planning_simulator_path)" if="$(eval &quot;'$(var run_mode)'=='planning_simulation'&quot;)"/>
+      <include file="$(find-pkg-share diagnostic_graph_aggregator)/launch/aggregator.launch.xml">
+        <arg name="param_file" value="$(var diagnostic_graph_aggregator_param_path)"/>
+        <arg name="graph_file" value="$(var graph_file)"/>
+      </include>
+
+      <!--  Convert /diagnostic_graph to /diagnostic_agg for debugging purposes -->
+      <include file="$(find-pkg-share diagnostic_graph_aggregator)/launch/converter.launch.xml">
+        <arg name="complement" value="true"/>
+      </include>
+
+      <!--  Convert diagnostic_graph to hazard_status for backward compatibility -->
+      <include file="$(find-pkg-share hazard_status_converter)/launch/hazard_status_converter.launch.xml"/>
     </group>
 
     <!-- Emergency Handler -->
